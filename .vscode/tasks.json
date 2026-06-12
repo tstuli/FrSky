@@ -1,0 +1,28 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Lua",
+      "type": "shell",
+      "command": "lua",
+      "args": ["${file}"],
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Make Build",
+      "type": "shell",
+      "command": "make",
+      "args": ["build"],
+      "presentation": {
+        "reveal": "always"
+      },
+      "problemMatcher": [
+        "$gcc"
+      ]
+    }
+  ]
+}
