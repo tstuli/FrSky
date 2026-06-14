@@ -45,9 +45,7 @@ local FUEL_BITMAP_W = 210
 local FUEL_BITMAP_H = 70
 local arcTempBitmap = nil
 local arcBattBitmap = nil
-local rpmBaseBitmap = nil
 local fuelBaseBitmap = nil
-local rpmDigitBitmaps = {}
 local spriteFontBitmaps = {}
 local arcBitmapLoadAttempted = false
 
@@ -146,14 +144,6 @@ local function loadArcBitmaps()
         "/scripts/aesbat2/arc_batt.png"
     }
 
-    local rpmPaths = {
-        "rpm_base.png",
-        "scripts/aesii/rpm_base.png",
-        "/scripts/aesii/rpm_base.png",
-        "scripts/aesrpm/rpm_base.png",
-        "/scripts/aesrpm/rpm_base.png"
-    }
-
     local fuelPaths = {
         "fuel_base.png",
         "scripts/aesii/fuel_base.png",
@@ -178,45 +168,11 @@ local function loadArcBitmaps()
         end
     end
 
-    for _, path in ipairs(rpmPaths) do
-        rpmBaseBitmap = tryLoadBitmap(path)
-
-        if rpmBaseBitmap ~= nil then
-            break
-        end
-    end
-
     for _, path in ipairs(fuelPaths) do
         fuelBaseBitmap = tryLoadBitmap(path)
 
         if fuelBaseBitmap ~= nil then
             break
-        end
-    end
-
-    for _, char in ipairs({
-        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "-"
-    }) do
-        local suffix = char
-
-        if char == "-" then
-            suffix = "dash"
-        end
-
-        local paths = {
-            "rpm_" .. suffix .. ".png",
-            "scripts/aesii/rpm_" .. suffix .. ".png",
-            "/scripts/aesii/rpm_" .. suffix .. ".png",
-            "scripts/aesrpm/rpm_" .. suffix .. ".png",
-            "/scripts/aesrpm/rpm_" .. suffix .. ".png"
-        }
-
-        for _, path in ipairs(paths) do
-            rpmDigitBitmaps[char] = tryLoadBitmap(path)
-
-            if rpmDigitBitmaps[char] ~= nil then
-                break
-            end
         end
     end
 end
@@ -493,43 +449,6 @@ local function drawTinyText(x, y, text, color, flags)
     else
         lcd.drawText(drawX, round(y), text)
     end
-end
-
-local RPM_SEGMENTS = {
-    ["0"] = {true, true, true, true, true, true, false},
-    ["1"] = {false, true, true, false, false, false, false},
-    ["2"] = {true, true, false, true, true, false, true},
-    ["3"] = {true, true, true, true, false, false, true},
-    ["4"] = {false, true, true, false, false, true, true},
-    ["5"] = {true, false, true, true, false, true, true},
-    ["6"] = {true, false, true, true, true, true, true},
-    ["7"] = {true, true, true, false, false, false, false},
-    ["8"] = {true, true, true, true, true, true, true},
-    ["9"] = {true, true, true, true, false, true, true},
-    ["-"] = {false, false, false, false, false, false, true}
-}
-
-local function drawSegmentDigit(x, y, char, color)
-    local seg = RPM_SEGMENTS[char]
-
-    if seg == nil then
-        return
-    end
-
-    local w = 15
-    local h = 28
-    local t = 4
-    local midY = y + 13
-
-    lcd.color(color)
-
-    if seg[1] then lcd.drawFilledRectangle(x + t, y, w - 2 * t, t) end
-    if seg[2] then lcd.drawFilledRectangle(x + w - t, y + t, t, 10) end
-    if seg[3] then lcd.drawFilledRectangle(x + w - t, midY + t, t, 10) end
-    if seg[4] then lcd.drawFilledRectangle(x + t, y + h - t, w - 2 * t, t) end
-    if seg[5] then lcd.drawFilledRectangle(x, midY + t, t, 10) end
-    if seg[6] then lcd.drawFilledRectangle(x, y + t, t, 10) end
-    if seg[7] then lcd.drawFilledRectangle(x + t, midY, w - 2 * t, t) end
 end
 
 local function drawRpmValue(x, y, text, color)
@@ -951,29 +870,21 @@ local function rpmBox(x, y, w, h, rpm, maxRpm)
         valueColor = COL_RED
     end
 
-    local baseDrawn = drawBitmapAt(
-        rpmBaseBitmap,
-        round(x),
-        round(y)
+    lcd.color(COL_BG)
+    lcd.drawFilledRectangle(
+        round(x + 15),
+        round(y + 25),
+        round(w - 30),
+        39
     )
 
-    if not baseDrawn then
-        lcd.color(COL_BG)
-        lcd.drawFilledRectangle(
-            round(x + 15),
-            round(y + 25),
-            round(w - 30),
-            39
-        )
-
-        lcd.color(COL_DIM)
-        lcd.drawRectangle(
-            round(x + 15),
-            round(y + 25),
-            round(w - 30),
-            39
-        )
-    end
+    lcd.color(COL_DIM)
+    lcd.drawRectangle(
+        round(x + 15),
+        round(y + 25),
+        round(w - 30),
+        39
+    )
 
     centeredText(
         x + w / 2,
@@ -1281,6 +1192,121 @@ local function fuelStrip(
 
 end
 
+local function annunciatorLamp(x, y, w, label, activeColor, active, stateText)
+    local bodyColor = lcd.RGB(14, 18, 24)
+    local borderColor = lcd.RGB(36, 42, 50)
+    local lampBezel = lcd.RGB(26, 31, 38)
+    local lampColor = active and activeColor or lcd.RGB(52, 58, 64)
+    local lampGlow = active and lcd.RGB(10, 42, 24) or lcd.RGB(18, 20, 24)
+    local labelColor = active and activeColor or COL_LABEL
+
+    lcd.color(bodyColor)
+    lcd.drawFilledRectangle(
+        round(x),
+        round(y),
+        round(w),
+        26
+    )
+
+    lcd.color(borderColor)
+    lcd.drawRectangle(round(x), round(y), round(w), 26)
+
+    lcd.color(lampGlow)
+    lcd.drawFilledRectangle(
+        round(x + 8),
+        round(y + 5),
+        16,
+        16
+    )
+
+    lcd.color(lampBezel)
+    lcd.drawFilledRectangle(
+        round(x + 10),
+        round(y + 7),
+        12,
+        12
+    )
+
+    lcd.color(lampColor)
+    lcd.drawFilledRectangle(
+        round(x + 12),
+        round(y + 9),
+        8,
+        8
+    )
+
+    if not drawSpriteText(
+        "small",
+        x + 38,
+        y + 3,
+        label,
+        labelColor
+    ) then
+        lcd.color(labelColor)
+        lcd.drawText(round(x + 38), round(y + 5), label)
+    end
+
+    if stateText ~= nil then
+        if not drawSpriteText(
+            "small",
+            x + w - 10,
+            y + 3,
+            stateText,
+            labelColor,
+            "right"
+        ) then
+            lcd.color(labelColor)
+            if RIGHT ~= nil then
+                lcd.drawText(round(x + w - 10), round(y + 5), stateText, RIGHT)
+            else
+                lcd.drawText(round(x + w - 10 - (#stateText * 6)), round(y + 5), stateText)
+            end
+        end
+    end
+end
+
+local function ignitionAnnunciator(x, y, w, enabled)
+    annunciatorLamp(
+        x,
+        y,
+        w,
+        "IGN",
+        COL_GREEN,
+        enabled ~= nil and enabled > 0,
+        nil
+    )
+end
+
+local function modeAnnunciator(x, y, w, modeValue)
+    local mode = 0
+
+    if modeValue ~= nil then
+        mode = round(modeValue)
+    end
+
+    local active = mode >= 0
+    local stateText = "OFF"
+    local activeColor = COL_LABEL
+
+    if mode >= 100 then
+        stateText = "STAB"
+        activeColor = COL_GREEN
+    elseif mode >= 0 then
+        stateText = "GYRO"
+        activeColor = COL_YELLOW
+    end
+
+    annunciatorLamp(
+        x,
+        y,
+        w,
+        stateText,
+        activeColor,
+        active,
+        nil
+    )
+end
+
 ------------------------------------------------------------
 -- PAINT
 ------------------------------------------------------------
@@ -1302,6 +1328,8 @@ local function paint(widget)
 
     local fuelFlow = getVal(widget.fuel_flow)
     local fuelRemaining = getVal(widget.fuel_remaining)
+    local ignitionEnabled = getVal(widget.ignition)
+    local modeState = getVal(widget.mode_state)
 
     --------------------------------------------------------
     -- Configuration
@@ -1525,6 +1553,20 @@ local function paint(widget)
             {0.15, 0.30, COL_YELLOW},
             {0.30, 1.00, COL_GREEN}
         }
+    )
+
+    ignitionAnnunciator(
+        w / 2 - 104,
+        topY + 210,
+        74,
+        ignitionEnabled
+    )
+
+    modeAnnunciator(
+        w / 2 - 10,
+        topY + 210,
+        136,
+        modeState
     )
 end
 
@@ -1986,6 +2028,23 @@ local function configure(widget)
         0,
         20000,
         0
+    )
+    end
+
+    if showAll or kind == "annunciators" then
+    --------------------------------------------------------
+    -- Annunciators
+    --------------------------------------------------------
+    form.addLine("-- Annunciators --")
+
+    bindSource(
+        "Ignition Source",
+        "ignition"
+    )
+
+    bindSource(
+        "Mode Source",
+        "mode_state"
     )
     end
 end

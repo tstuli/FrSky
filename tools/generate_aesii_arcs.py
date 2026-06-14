@@ -10,12 +10,8 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "aesii"))
 
 SIZE = 216
-RPM_W = 205
-RPM_H = 90
 FUEL_W = 210
 FUEL_H = 70
-RPM_DIGIT_W = 24
-RPM_DIGIT_H = 42
 SCALE = 4
 W = SIZE * SCALE
 H = SIZE * SCALE
@@ -234,19 +230,6 @@ def stroke_rect(img, x, y, w, h, color, thickness=1):
     fill_rect(img, x + w - thickness, y, thickness, h, color)
 
 
-def make_rpm_base(path):
-    width = RPM_W * SCALE
-    height = RPM_H * SCALE
-    img = [[(0, 0, 0, 0) for _ in range(width)] for _ in range(height)]
-
-    fill_rect(img, 15 * SCALE, 25 * SCALE, width - 30 * SCALE, 39 * SCALE, (2, 4, 6, 245))
-    stroke_rect(img, 15 * SCALE, 25 * SCALE, width - 30 * SCALE, 39 * SCALE, (30, 40, 48, 255), SCALE)
-
-    fill_rect(img, 16 * SCALE, 74 * SCALE, width - 32 * SCALE, SCALE, (238, 242, 244, 255))
-
-    write_png(path, downsample(img, RPM_W, RPM_H))
-
-
 def make_fuel_base(path):
     width = FUEL_W * SCALE
     height = FUEL_H * SCALE
@@ -260,54 +243,6 @@ def make_fuel_base(path):
     fill_rect(img, line_x + line_w - 2 * SCALE, line_y - 2 * SCALE, 2 * SCALE, 4 * SCALE, (238, 242, 244, 255))
 
     write_png(path, downsample(img, FUEL_W, FUEL_H))
-
-
-SEGMENTS = {
-    "0": (True, True, True, True, True, True, False),
-    "1": (False, True, True, False, False, False, False),
-    "2": (True, True, False, True, True, False, True),
-    "3": (True, True, True, True, False, False, True),
-    "4": (False, True, True, False, False, True, True),
-    "5": (True, False, True, True, False, True, True),
-    "6": (True, False, True, True, True, True, True),
-    "7": (True, True, True, False, False, False, False),
-    "8": (True, True, True, True, True, True, True),
-    "9": (True, True, True, True, False, True, True),
-    "-": (False, False, False, False, False, False, True),
-}
-
-
-def draw_segment(img, name, color):
-    w = RPM_DIGIT_W * SCALE
-    h = RPM_DIGIT_H * SCALE
-    t = 5 * SCALE
-    inset = 4 * SCALE
-    mid = h // 2
-
-    segments = {
-        "a": (inset + t, inset, w - 2 * (inset + t), t),
-        "b": (w - inset - t, inset + t, t, mid - inset - t),
-        "c": (w - inset - t, mid + t, t, h - mid - inset - 2 * t),
-        "d": (inset + t, h - inset - t, w - 2 * (inset + t), t),
-        "e": (inset, mid + t, t, h - mid - inset - 2 * t),
-        "f": (inset, inset + t, t, mid - inset - t),
-        "g": (inset + t, mid, w - 2 * (inset + t), t),
-    }
-
-    fill_rect(img, *segments[name], color)
-
-
-def make_rpm_digit(path, char):
-    width = RPM_DIGIT_W * SCALE
-    height = RPM_DIGIT_H * SCALE
-    img = [[(0, 0, 0, 0) for _ in range(width)] for _ in range(height)]
-    active = SEGMENTS[char]
-
-    for enabled, name in zip(active, ("a", "b", "c", "d", "e", "f", "g")):
-        if enabled:
-            draw_segment(img, name, RED)
-
-    write_png(path, downsample(img, RPM_DIGIT_W, RPM_DIGIT_H))
 
 
 def get_font(size):
@@ -385,12 +320,7 @@ def main():
             ((7.6 - 6.0) / (8.4 - 6.0), 1.00, GREEN),
         ],
     )
-    make_rpm_base(os.path.join(OUT_DIR, "rpm_base.png"))
     make_fuel_base(os.path.join(OUT_DIR, "fuel_base.png"))
-
-    for char in "0123456789-":
-        suffix = "dash" if char == "-" else char
-        make_rpm_digit(os.path.join(OUT_DIR, "rpm_" + suffix + ".png"), char)
 
     make_font_glyphs()
 
