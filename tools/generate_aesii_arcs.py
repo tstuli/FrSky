@@ -3,6 +3,8 @@ import os
 import struct
 import zlib
 
+from PIL import Image, ImageDraw, ImageFont
+
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "aesii"))
@@ -32,6 +34,31 @@ CYAN = (0, 190, 225, 255)
 DARK = (8, 10, 14, 255)
 BOX = (17, 21, 28, 255)
 DIM = (42, 49, 58, 255)
+LABEL = (155, 172, 186, 255)
+WHITE = (255, 255, 255, 255)
+
+FONT_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz./- "
+FONT_VARIANTS = {
+    "label": LABEL,
+    "white": WHITE,
+    "green": GREEN,
+    "yellow": YELLOW,
+    "red": RED,
+}
+FONT_SPECS = {
+    "small": {"size": 17, "w": 11, "h": 20, "y": -1},
+    "value": {"size": 24, "w": 17, "h": 28, "y": -2},
+    "rpm": {"size": 31, "w": 20, "h": 35, "y": -3},
+}
+FONT_PATHS = (
+    "/System/Library/Fonts/HelveticaNeue.ttc",
+    "/System/Library/Fonts/Helvetica.ttc",
+    "/System/Library/Fonts/Avenir Next.ttc",
+    "/System/Library/Fonts/Avenir.ttc",
+    "/System/Library/Fonts/SFNS.ttf",
+    "/System/Library/Fonts/SFCompact.ttf",
+)
+FONT_RENDER_SCALE = 4
 
 
 def color_for_pos(pos, zones):
@@ -283,6 +310,63 @@ def make_rpm_digit(path, char):
     write_png(path, downsample(img, RPM_DIGIT_W, RPM_DIGIT_H))
 
 
+def get_font(size):
+    for path in FONT_PATHS:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, size=size)
+            except OSError:
+                pass
+
+    return ImageFont.load_default()
+
+
+def make_font_glyphs():
+    for font_name, spec in FONT_SPECS.items():
+        scale = FONT_RENDER_SCALE
+        font = get_font(spec["size"] * scale)
+
+        for variant_name, color in FONT_VARIANTS.items():
+            for char in FONT_CHARS:
+                if char == " ":
+                    continue
+
+                image = Image.new(
+                    "RGBA",
+                    (spec["w"] * scale, spec["h"] * scale),
+                    (0, 0, 0, 0),
+                )
+                draw = ImageDraw.Draw(image)
+                bbox = draw.textbbox((0, 0), char, font=font)
+                text_w = bbox[2] - bbox[0]
+                text_h = bbox[3] - bbox[1]
+                text_x = (spec["w"] * scale - text_w) // 2 - bbox[0]
+                text_y = (
+                    (spec["h"] * scale - text_h) // 2 -
+                    bbox[1] +
+                    spec["y"] * scale
+                )
+
+                draw.text(
+                    (text_x, text_y),
+                    char,
+                    font=font,
+                    fill=color,
+                )
+
+                image = image.resize(
+                    (spec["w"], spec["h"]),
+                    Image.Resampling.LANCZOS,
+                )
+
+                filename = "font_%s_%s_%04x.png" % (
+                    font_name,
+                    variant_name,
+                    ord(char),
+                )
+                image.save(os.path.join(OUT_DIR, filename))
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     make(
@@ -307,6 +391,8 @@ def main():
     for char in "0123456789-":
         suffix = "dash" if char == "-" else char
         make_rpm_digit(os.path.join(OUT_DIR, "rpm_" + suffix + ".png"), char)
+
+    make_font_glyphs()
 
 
 if __name__ == "__main__":
