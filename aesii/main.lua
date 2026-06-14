@@ -746,8 +746,8 @@ local function semiGauge(
 )
     local position = valuePercent(value, minValue, maxValue)
 
-    local startAngle = 195
-    local endAngle = 335
+    local startAngle = 180
+    local endAngle = 300
     local sweep = endAngle - startAngle
 
     local thickness = math.floor(
@@ -1379,7 +1379,7 @@ local function paint(widget)
     local chtRightX = rightX + 4
 
     local topY = mainPanelY + 58
-    local chtY = topY + 30
+    local chtY = topY + 36
     local bottomY = h - 50
 
     local radius = math.floor(
