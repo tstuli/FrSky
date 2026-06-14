@@ -27,6 +27,7 @@ GREEN = (20, 220, 115, 255)
 YELLOW = (255, 210, 0, 255)
 RED = (250, 55, 55, 255)
 GREY = (120, 130, 140, 255)
+SHADOW_LIGHT = (92, 98, 106, 255)
 CYAN = (0, 190, 225, 255)
 DARK = (8, 10, 14, 255)
 BOX = (17, 21, 28, 255)
@@ -154,20 +155,75 @@ def draw_arc_band(img, inner, outer, zones):
                 )
 
 
-def draw_arc(img, zones):
-    draw_arc_band(
-        img,
-        RADIUS - THICKNESS - 4 * SCALE,
-        RADIUS + 2 * SCALE,
-        [(0.0, 1.0, GREY)],
+def lerp_color(a, b, t):
+    return (
+        int(a[0] + (b[0] - a[0]) * t + 0.5),
+        int(a[1] + (b[1] - a[1]) * t + 0.5),
+        int(a[2] + (b[2] - a[2]) * t + 0.5),
+        255,
     )
+
+
+def draw_arc_end_line(img, angle_deg, outer_radius, inner_radius):
+    angle = math.radians(angle_deg)
+    cos_a = math.cos(angle)
+    sin_a = math.sin(angle)
+    tangent_x = -sin_a
+    tangent_y = cos_a
+    x1 = CENTER_X + cos_a * inner_radius
+    y1 = CENTER_Y + sin_a * inner_radius
+    x2 = CENTER_X + cos_a * outer_radius
+    y2 = CENTER_Y + sin_a * outer_radius
+
+    steps = max(1, int(math.hypot(x2 - x1, y2 - y1) * 2))
+
+    for step in range(steps + 1):
+        t = step / steps
+        x = int(x1 + (x2 - x1) * t + 0.5)
+        y = int(y1 + (y2 - y1) * t + 0.5)
+
+        for ox, oy in ((0, 0), (int(round(tangent_x)), int(round(tangent_y)))):
+            px = x + ox
+            py = y + oy
+
+            if 0 <= px < W and 0 <= py < H:
+                img[py][px] = blend_over(img[py][px], WHITE, 1.0)
+
+
+def draw_arc(img, zones):
+    shadow_outer = RADIUS - 1 * SCALE
+    color_thickness = max(6 * SCALE, math.floor(THICKNESS * 0.098))
+    shadow_depth = max(12 * SCALE, THICKNESS + 7 * SCALE)
+    shadow_steps = 12
+
+    for step in range(shadow_steps):
+        t = step / (shadow_steps - 1)
+        outer = shadow_outer - (shadow_depth * step / shadow_steps)
+        band_thickness = max(2 * SCALE, math.ceil(shadow_depth / shadow_steps) + SCALE)
+        color = lerp_color((150, 156, 164, 255), (34, 38, 44, 255), t)
+
+        draw_arc_band(
+            img,
+            outer - band_thickness,
+            outer,
+            [(0.0, 1.0, color)]
+        )
 
     draw_arc_band(
         img,
-        RADIUS - THICKNESS,
+        RADIUS - color_thickness,
         RADIUS,
         zones,
     )
+
+    line_inner = shadow_outer - shadow_depth + 1
+    for angle in (START_DEG, END_DEG):
+        draw_arc_end_line(
+            img,
+            angle,
+            RADIUS,
+            line_inner,
+        )
 
 
 def downsample(img, out_w, out_h):

@@ -129,38 +129,19 @@ local function loadArcBitmaps()
     local tempPaths = {
         "images/arc_temp.png",
         "scripts/aesii/images/arc_temp.png",
-        "/scripts/aesii/images/arc_temp.png",
-        "arc_temp.png",
-        "scripts/aesii/arc_temp.png",
-        "/scripts/aesii/arc_temp.png",
-        "scripts/aestemp/arc_temp.png",
-        "/scripts/aestemp/arc_temp.png",
-        "scripts/aescht2/arc_temp.png",
-        "/scripts/aescht2/arc_temp.png"
+        "/scripts/aesii/images/arc_temp.png"
     }
 
     local battPaths = {
         "images/arc_batt.png",
         "scripts/aesii/images/arc_batt.png",
-        "/scripts/aesii/images/arc_batt.png",
-        "arc_batt.png",
-        "scripts/aesii/arc_batt.png",
-        "/scripts/aesii/arc_batt.png",
-        "scripts/aesbatt/arc_batt.png",
-        "/scripts/aesbatt/arc_batt.png",
-        "scripts/aesbat2/arc_batt.png",
-        "/scripts/aesbat2/arc_batt.png"
+        "/scripts/aesii/images/arc_batt.png"
     }
 
     local fuelPaths = {
         "images/fuel_base.png",
         "scripts/aesii/images/fuel_base.png",
-        "/scripts/aesii/images/fuel_base.png",
-        "fuel_base.png",
-        "scripts/aesii/fuel_base.png",
-        "/scripts/aesii/fuel_base.png",
-        "scripts/aesfuel/fuel_base.png",
-        "/scripts/aesfuel/fuel_base.png"
+        "/scripts/aesii/images/fuel_base.png"
     }
 
     for _, path in ipairs(tempPaths) do
@@ -816,36 +797,6 @@ local function drawRotatedRectangle(
     fillTriangle(x1, y1, x3, y3, x4, y4, color)
 end
 
-------------------------------------------------------------
--- ARC SEGMENT
---
--- A short rotated rectangle tangent to the arc.
-------------------------------------------------------------
-local function drawArcSegment(
-    centerX,
-    centerY,
-    radius,
-    angleDegrees,
-    segmentAngle,
-    thickness,
-    color
-)
-    lcd.color(color)
-
-    local startRadians = math.rad(angleDegrees)
-    local endRadians = math.rad(angleDegrees + segmentAngle + 4)
-    local innerRadius = radius - thickness
-
-    for segmentRadius = innerRadius, radius, 2 do
-        lcd.drawLine(
-            round(centerX + math.cos(startRadians) * segmentRadius),
-            round(centerY + math.sin(startRadians) * segmentRadius),
-            round(centerX + math.cos(endRadians) * segmentRadius),
-            round(centerY + math.sin(endRadians) * segmentRadius)
-        )
-    end
-end
-
 -- GARMIN-STYLE ARC GAUGE
 ------------------------------------------------------------
 local function semiGauge(
@@ -870,50 +821,10 @@ local function semiGauge(
     local sweep = endAngle - startAngle
 
     local thickness = math.floor(
-        clamp(radius * 0.19, 10, 13)
+        clamp(radius * 0.131, 8, 12)
     )
 
-    local segmentStep = 2
-
-    --------------------------------------------------------
-    -- Range arc
-    --------------------------------------------------------
-    if radius < 72 or not drawArcBitmap(arcBitmap, centerX, centerY) then
-        for angle = startAngle, endAngle, segmentStep do
-            local segmentPosition =
-                (angle - startAngle) / sweep
-
-            drawArcSegment(
-                centerX,
-                centerY,
-                radius,
-                angle,
-                segmentStep,
-                thickness,
-                zoneColor(segmentPosition, zones)
-            )
-        end
-    end
-
-    --------------------------------------------------------
-    -- End markers and small numeric limits
-    --------------------------------------------------------
-    for _, tickPosition in ipairs({0, 1}) do
-        local tickAngle = math.rad(
-            startAngle + sweep * tickPosition
-        )
-
-        local outerRadius = radius + 4
-        local innerRadius = radius - thickness - 7
-
-        lcd.color(COL_WHITE)
-        lcd.drawLine(
-            round(centerX + math.cos(tickAngle) * outerRadius),
-            round(centerY + math.sin(tickAngle) * outerRadius),
-            round(centerX + math.cos(tickAngle) * innerRadius),
-            round(centerY + math.sin(tickAngle) * innerRadius)
-        )
-    end
+    drawArcBitmap(arcBitmap, centerX, centerY)
 
     local minLabelAngle = math.rad(startAngle)
     local minLabelRadius = radius - thickness - 1
