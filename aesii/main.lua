@@ -2242,6 +2242,58 @@ local function configure(widget)
 end
 
 ------------------------------------------------------------
+-- PERSISTENCE
+------------------------------------------------------------
+local PERSISTENT_FIELDS = {
+    "kind",
+
+    "cht1_label",
+    "temp1",
+    "t1_min",
+    "t1_max",
+
+    "cht2_label",
+    "temp2",
+    "t2_min",
+    "t2_max",
+
+    "bat1_label",
+    "volt1",
+    "v1_min",
+    "v1_max",
+
+    "bat2_label",
+    "volt2",
+    "v2_min",
+    "v2_max",
+
+    "rpm",
+    "rpm_max",
+
+    "fuel_flow",
+    "ff_max",
+    "fuel_remaining",
+    "fuel_cap",
+
+    "ignition",
+    "mode_state"
+}
+
+local function read(widget)
+    for _, field in ipairs(PERSISTENT_FIELDS) do
+        widget[field] = storage.read(field)
+    end
+
+    widget._lastRenderKey = nil
+end
+
+local function write(widget)
+    for _, field in ipairs(PERSISTENT_FIELDS) do
+        storage.write(field, widget[field])
+    end
+end
+
+------------------------------------------------------------
 -- INITIALIZATION
 ------------------------------------------------------------
 local function init()
@@ -2255,7 +2307,9 @@ local function init()
 
         paint = paint,
         wakeup = wakeup,
-        configure = configure
+        configure = configure,
+        read = read,
+        write = write
     })
 end
 
