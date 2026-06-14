@@ -1388,9 +1388,9 @@ local function paint(widget)
 
     local topLabelY = topY - 4
     local topValueY = topY + 18
-    local chtValueY = chtY + 18
+    local chtValueY = chtY + 4
     local chtLabelY = chtValueY + 19
-    local bottomValueY = bottomY + 12
+    local bottomValueY = bottomY + 6
     local bottomLabelY = bottomValueY + 19
 
     --------------------------------------------------------
@@ -1498,7 +1498,7 @@ local function paint(widget)
         w / 2 - FUEL_BITMAP_W / 2,
         topY + 54,
         FUEL_BITMAP_W,
-        "FF mL/min",
+        "FF ML/MIN",
         fuelFlow,
         0,
         flowMax,
@@ -1514,7 +1514,7 @@ local function paint(widget)
         w / 2 - FUEL_BITMAP_W / 2,
         topY + 132,
         FUEL_BITMAP_W,
-        "FUEL mL",
+        "FUEL ML",
         fuelRemaining,
         0,
         fuelCapacity,
@@ -1668,7 +1668,7 @@ local function paintFuel(widget)
         x,
         y,
         FUEL_BITMAP_W,
-        "FF mL/min",
+        "FF ML/MIN",
         getVal(widget.fuel_flow),
         0,
         widget.ff_max or 100,
@@ -1684,7 +1684,7 @@ local function paintFuel(widget)
         x,
         y + FUEL_BITMAP_H + gap,
         FUEL_BITMAP_W,
-        "FUEL mL",
+        "FUEL ML",
         getVal(widget.fuel_remaining),
         0,
         widget.fuel_cap or 1000,
