@@ -1,3 +1,4 @@
+import argparse
 import math
 import os
 import struct
@@ -13,6 +14,8 @@ IMAGE_DIR = os.path.join(OUT_DIR, "images")
 SIZE = 216
 FUEL_W = 210
 FUEL_H = 70
+FUEL_REMAINING_W = 182
+FUEL_REMAINING_H = 70
 SCALE = 4
 W = SIZE * SCALE
 H = SIZE * SCALE
@@ -318,6 +321,82 @@ def make_fuel_base(path):
     write_png(path, downsample(img, FUEL_W, FUEL_H))
 
 
+def draw_label(draw, font, text, x, y, color):
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    draw.text(
+        (x - text_w // 2 - bbox[0], y - text_h // 2 - bbox[1]),
+        text,
+        font=font,
+        fill=color,
+    )
+
+
+def make_fuel_remaining_base(path):
+    width = FUEL_REMAINING_W * SCALE
+    height = FUEL_REMAINING_H * SCALE
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    font = get_font(16 * SCALE)
+
+    line_x = 9 * SCALE
+    line_y = 35 * SCALE
+    line_w = 170 * SCALE
+    line_h = 3 * SCALE
+    red_w = 6 * SCALE
+    quarter = line_w / 4
+    shadow = (46, 52, 60, 200)
+
+    draw.rectangle(
+        [line_x, line_y, line_x + red_w, line_y + line_h],
+        fill=RED,
+    )
+    draw.rectangle(
+        [line_x + red_w, line_y, line_x + line_w, line_y + line_h],
+        fill=(238, 242, 244, 255),
+    )
+    draw.rectangle(
+        [line_x, line_y + 2 * SCALE, line_x + line_w, line_y + line_h + 2 * SCALE],
+        fill=shadow,
+    )
+
+    for fraction in (0.25, 0.50, 0.75):
+        marker_x = int(line_x + quarter * fraction * 4 + 0.5)
+        draw.rectangle(
+            [marker_x - SCALE // 2 + SCALE, line_y - 6 * SCALE + SCALE, marker_x + SCALE // 2 + SCALE, line_y + 8 * SCALE + SCALE],
+            fill=shadow,
+        )
+        draw.rectangle(
+            [marker_x - SCALE // 2, line_y - 6 * SCALE, marker_x + SCALE // 2, line_y + 8 * SCALE],
+            fill=(238, 242, 244, 255),
+        )
+
+    draw.rectangle([line_x + SCALE, line_y - 7 * SCALE + SCALE, line_x + 3 * SCALE + SCALE, line_y + 9 * SCALE + SCALE], fill=shadow)
+    draw.rectangle([line_x, line_y - 7 * SCALE, line_x + 3 * SCALE, line_y + 9 * SCALE], fill=RED)
+    draw.rectangle([line_x + int(quarter) + SCALE, line_y - 5 * SCALE + SCALE, line_x + int(quarter) + 2 * SCALE + SCALE, line_y + 7 * SCALE + SCALE], fill=shadow)
+    draw.rectangle([line_x + int(quarter), line_y - 5 * SCALE, line_x + int(quarter) + 2 * SCALE, line_y + 7 * SCALE], fill=(238, 242, 244, 255))
+    draw.rectangle([line_x + int(quarter * 2) + SCALE, line_y - 5 * SCALE + SCALE, line_x + int(quarter * 2) + 2 * SCALE + SCALE, line_y + 7 * SCALE + SCALE], fill=shadow)
+    draw.rectangle([line_x + int(quarter * 2), line_y - 5 * SCALE, line_x + int(quarter * 2) + 2 * SCALE, line_y + 7 * SCALE], fill=(238, 242, 244, 255))
+    draw.rectangle([line_x + int(quarter * 3) + SCALE, line_y - 5 * SCALE + SCALE, line_x + int(quarter * 3) + 2 * SCALE + SCALE, line_y + 7 * SCALE + SCALE], fill=shadow)
+    draw.rectangle([line_x + int(quarter * 3), line_y - 5 * SCALE, line_x + int(quarter * 3) + 2 * SCALE, line_y + 7 * SCALE], fill=(238, 242, 244, 255))
+    draw.rectangle([line_x + line_w - 3 * SCALE + SCALE, line_y - 7 * SCALE + SCALE, line_x + line_w + SCALE, line_y + 9 * SCALE + SCALE], fill=shadow)
+    draw.rectangle([line_x + line_w - 3 * SCALE, line_y - 7 * SCALE, line_x + line_w, line_y + 9 * SCALE], fill=GREEN)
+
+    draw_label(draw, font, "FUEL QTY", width // 2, 12 * SCALE, LABEL)
+    draw_label(draw, font, "0", line_x, 58 * SCALE, LABEL)
+    draw_label(draw, font, "25", line_x + quarter, 58 * SCALE, LABEL)
+    draw_label(draw, font, "50", line_x + quarter * 2, 58 * SCALE, LABEL)
+    draw_label(draw, font, "75", line_x + quarter * 3, 58 * SCALE, LABEL)
+    draw_label(draw, font, "F", line_x + line_w, 58 * SCALE, LABEL)
+
+    img = img.resize(
+        (FUEL_REMAINING_W, FUEL_REMAINING_H),
+        Image.Resampling.LANCZOS,
+    )
+    img.save(path)
+
+
 def get_font(size):
     for path in FONT_PATHS:
         if os.path.exists(path):
@@ -429,29 +508,63 @@ def make_label_assets():
         )
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Generate AES-II dashboard PNG assets."
+    )
+    parser.add_argument("--all", action="store_true", help="Regenerate every asset.")
+    parser.add_argument("--arc-temp", action="store_true", help="Regenerate arc_temp.png.")
+    parser.add_argument("--arc-batt", action="store_true", help="Regenerate arc_batt.png.")
+    parser.add_argument("--fuel-base", action="store_true", help="Regenerate fuel_base.png.")
+    parser.add_argument("--fuel-remaining", action="store_true", help="Regenerate fuel_remaining.png.")
+    parser.add_argument("--labels", action="store_true", help="Regenerate label PNGs.")
+    parser.add_argument("--fonts", action="store_true", help="Regenerate font glyph PNGs.")
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+    selected = any(
+        [
+            args.all,
+            args.arc_temp,
+            args.arc_batt,
+            args.fuel_base,
+            args.fuel_remaining,
+            args.labels,
+            args.fonts,
+        ]
+    )
+
     os.makedirs(OUT_DIR, exist_ok=True)
     os.makedirs(IMAGE_DIR, exist_ok=True)
-    make(
-        os.path.join(IMAGE_DIR, "arc_temp.png"),
-        [
-            (0.00, (90 - 10) / (150 - 10), GREEN),
-            ((90 - 10) / (150 - 10), (100 - 10) / (150 - 10), YELLOW),
-            ((100 - 10) / (150 - 10), 1.00, RED),
-        ],
-    )
-    make(
-        os.path.join(IMAGE_DIR, "arc_batt.png"),
-        [
-            (0.00, (7.2 - 6.0) / (8.4 - 6.0), RED),
-            ((7.2 - 6.0) / (8.4 - 6.0), (7.6 - 6.0) / (8.4 - 6.0), YELLOW),
-            ((7.6 - 6.0) / (8.4 - 6.0), 1.00, GREEN),
-        ],
-    )
-    make_fuel_base(os.path.join(IMAGE_DIR, "fuel_base.png"))
+    if not selected or args.all or args.arc_temp:
+        make(
+            os.path.join(IMAGE_DIR, "arc_temp.png"),
+            [
+                (0.00, (90 - 10) / (150 - 10), GREEN),
+                ((90 - 10) / (150 - 10), (100 - 10) / (150 - 10), YELLOW),
+                ((100 - 10) / (150 - 10), 1.00, RED),
+            ],
+        )
+    if not selected or args.all or args.arc_batt:
+        make(
+            os.path.join(IMAGE_DIR, "arc_batt.png"),
+            [
+                (0.00, (7.2 - 6.0) / (8.4 - 6.0), RED),
+                ((7.2 - 6.0) / (8.4 - 6.0), (7.6 - 6.0) / (8.4 - 6.0), YELLOW),
+                ((7.6 - 6.0) / (8.4 - 6.0), 1.00, GREEN),
+            ],
+        )
+    if not selected or args.all or args.fuel_base:
+        make_fuel_base(os.path.join(IMAGE_DIR, "fuel_base.png"))
+    if not selected or args.all or args.fuel_remaining:
+        make_fuel_remaining_base(os.path.join(IMAGE_DIR, "fuel_remaining.png"))
 
-    make_label_assets()
-    make_font_glyphs()
+    if not selected or args.all or args.labels:
+        make_label_assets()
+    if not selected or args.all or args.fonts:
+        make_font_glyphs()
 
 
 if __name__ == "__main__":

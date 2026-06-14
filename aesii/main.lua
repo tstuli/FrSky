@@ -43,9 +43,12 @@ local RPM_BITMAP_W = 205
 local RPM_BITMAP_H = 90
 local FUEL_BITMAP_W = 210
 local FUEL_BITMAP_H = 70
+local FUEL_REMAINING_LINE_X = 9
+local FUEL_REMAINING_LINE_W = 170
 local arcTempBitmap = nil
 local arcBattBitmap = nil
 local fuelBaseBitmap = nil
+local fuelRemainingBitmap = nil
 local labelBitmaps = {}
 local spriteFontBitmaps = {}
 local arcBitmapLoadAttempted = false
@@ -149,6 +152,12 @@ local function loadArcBitmaps()
         "/scripts/aesii/images/fuel_base.png"
     }
 
+    local fuelRemainingPaths = {
+        "images/fuel_remaining.png",
+        "scripts/aesii/images/fuel_remaining.png",
+        "/scripts/aesii/images/fuel_remaining.png"
+    }
+
     for _, path in ipairs(tempPaths) do
         arcTempBitmap = tryLoadBitmap(path)
 
@@ -169,6 +178,14 @@ local function loadArcBitmaps()
         fuelBaseBitmap = tryLoadBitmap(path)
 
         if fuelBaseBitmap ~= nil then
+            break
+        end
+    end
+
+    for _, path in ipairs(fuelRemainingPaths) do
+        fuelRemainingBitmap = tryLoadBitmap(path)
+
+        if fuelRemainingBitmap ~= nil then
             break
         end
     end
@@ -1204,7 +1221,9 @@ local function fuelStrip(
     maxValue,
     unit,
     decimals,
-    zones
+    zones,
+    baseBitmap,
+    faceStyle
 )
     local position = valuePercent(
         value,
@@ -1221,7 +1240,7 @@ local function fuelStrip(
     end
 
     local baseDrawn = drawBitmapAt(
-        fuelBaseBitmap,
+        baseBitmap or fuelBaseBitmap,
         round(x),
         round(y)
     )
@@ -1236,40 +1255,98 @@ local function fuelStrip(
         )
     end
 
-    local labelBitmapName = fuelLabelBitmapName(label)
+    if faceStyle ~= "remaining" then
+        local labelBitmapName = fuelLabelBitmapName(label)
 
-    if not (
-        labelBitmapName ~= nil and
-        drawLabelBitmap(labelBitmapName, x + 4, y + 4)
-    ) and not drawSpriteText(
-            "small",
-            x + 4,
-            y + 4,
-            label,
-            COL_LABEL
-        ) then
-        lcd.color(COL_LABEL)
-        lcd.drawText(
-            round(x + 4),
-            round(y + 4),
-            label
-        )
+        if not (
+            labelBitmapName ~= nil and
+            drawLabelBitmap(labelBitmapName, x + 4, y + 4)
+        ) and not drawSpriteText(
+                "small",
+                x + 4,
+                y + 4,
+                label,
+                COL_LABEL
+            ) then
+            lcd.color(COL_LABEL)
+            lcd.drawText(
+                round(x + 4),
+                round(y + 4),
+                label
+            )
+        end
     end
 
     local stripValueText = formatValue(value, decimals, unit)
 
-    drawNativeValue(
-        x + w - 6,
-        y + 5,
-        stripValueText,
-        valueColor,
-        "right"
-    )
+    if faceStyle ~= "remaining" then
+        drawNativeValue(
+            x + w - 6,
+            y + 5,
+            stripValueText,
+            valueColor,
+            "right"
+        )
+    end
 
     local lineY = y + 43
     local lineX = x + 10
     local lineW = 130
-    local markerX = lineX + lineW * position
+
+    if faceStyle == "remaining" then
+        lineY = y + 38
+        lineX = x + FUEL_REMAINING_LINE_X
+        lineW = FUEL_REMAINING_LINE_W
+    end
+
+    if faceStyle == "remaining" then
+        local lastX = lineX
+
+        if zones ~= nil then
+            for _, zone in ipairs(zones) do
+                local zoneStart = clamp(zone[1], 0, 1)
+                local zoneEnd = clamp(zone[2], 0, 1)
+                local segX1 = lineX + lineW * zoneStart
+                local segX2 = lineX + lineW * zoneEnd
+
+                if segX2 > segX1 then
+                    lcd.color(zone[3])
+                    lcd.drawLine(
+                        round(segX1),
+                        round(lineY),
+                        round(segX2),
+                        round(lineY)
+                    )
+                    lcd.drawLine(
+                        round(segX1),
+                        round(lineY + 1),
+                        round(segX2),
+                        round(lineY + 1)
+                    )
+                    lastX = segX2
+                end
+            end
+        end
+
+        if lastX < lineX + lineW then
+            lcd.color(COL_GREEN)
+            lcd.drawLine(
+                round(lastX),
+                round(lineY),
+                round(lineX + lineW),
+                round(lineY)
+            )
+            lcd.drawLine(
+                round(lastX),
+                round(lineY + 1),
+                round(lineX + lineW),
+                round(lineY + 1)
+            )
+        end
+    end
+
+    local markerPosition = clamp(position, 0, 1)
+    local markerX = lineX + lineW * markerPosition
 
     lcd.color(valueColor)
     lcd.drawFilledRectangle(
@@ -1286,6 +1363,10 @@ local function fuelStrip(
         round(markerX + 7),
         round(lineY - 12)
     )
+
+    if faceStyle == "remaining" then
+        return
+    end
 
     if not drawSpriteText(
         "small",
@@ -1688,7 +1769,9 @@ local function paint(widget)
             {0.00, 0.15, COL_RED},
             {0.15, 0.30, COL_YELLOW},
             {0.30, 1.00, COL_GREEN}
-        }
+        },
+        fuelRemainingBitmap,
+        "remaining"
     )
 
     local annunciatorW = 102
@@ -1878,7 +1961,9 @@ local function paintFuel(widget)
             {0.00, 0.15, COL_RED},
             {0.15, 0.30, COL_YELLOW},
             {0.30, 1.00, COL_GREEN}
-        }
+        },
+        fuelRemainingBitmap,
+        "remaining"
     )
 end
 
