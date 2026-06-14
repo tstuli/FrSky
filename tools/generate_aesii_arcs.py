@@ -8,6 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "aesii"))
+IMAGE_DIR = os.path.join(OUT_DIR, "images")
 
 SIZE = 216
 FUEL_W = 210
@@ -330,7 +331,7 @@ def make_font_glyphs():
                     variant_name,
                     ord(char),
                 )
-                image.save(os.path.join(OUT_DIR, filename))
+                image.save(os.path.join(IMAGE_DIR, filename))
 
 
 def render_text_asset(path, text, font_name, variant_name):
@@ -373,7 +374,7 @@ def render_text_asset(path, text, font_name, variant_name):
 def make_label_assets():
     for name, text, font_name, variant_name in LABEL_ASSETS:
         render_text_asset(
-            os.path.join(OUT_DIR, "label_" + name + ".png"),
+            os.path.join(IMAGE_DIR, "label_" + name + ".png"),
             text,
             font_name,
             variant_name,
@@ -382,8 +383,9 @@ def make_label_assets():
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
+    os.makedirs(IMAGE_DIR, exist_ok=True)
     make(
-        os.path.join(OUT_DIR, "arc_temp.png"),
+        os.path.join(IMAGE_DIR, "arc_temp.png"),
         [
             (0.00, (90 - 10) / (150 - 10), GREEN),
             ((90 - 10) / (150 - 10), (100 - 10) / (150 - 10), YELLOW),
@@ -391,14 +393,14 @@ def main():
         ],
     )
     make(
-        os.path.join(OUT_DIR, "arc_batt.png"),
+        os.path.join(IMAGE_DIR, "arc_batt.png"),
         [
             (0.00, (7.2 - 6.0) / (8.4 - 6.0), RED),
             ((7.2 - 6.0) / (8.4 - 6.0), (7.6 - 6.0) / (8.4 - 6.0), YELLOW),
             ((7.6 - 6.0) / (8.4 - 6.0), 1.00, GREEN),
         ],
     )
-    make_fuel_base(os.path.join(OUT_DIR, "fuel_base.png"))
+    make_fuel_base(os.path.join(IMAGE_DIR, "fuel_base.png"))
 
     make_label_assets()
     make_font_glyphs()

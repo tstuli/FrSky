@@ -126,6 +126,9 @@ local function loadArcBitmaps()
     arcBitmapLoadAttempted = true
 
     local tempPaths = {
+        "images/arc_temp.png",
+        "scripts/aesii/images/arc_temp.png",
+        "/scripts/aesii/images/arc_temp.png",
         "arc_temp.png",
         "scripts/aesii/arc_temp.png",
         "/scripts/aesii/arc_temp.png",
@@ -136,6 +139,9 @@ local function loadArcBitmaps()
     }
 
     local battPaths = {
+        "images/arc_batt.png",
+        "scripts/aesii/images/arc_batt.png",
+        "/scripts/aesii/images/arc_batt.png",
         "arc_batt.png",
         "scripts/aesii/arc_batt.png",
         "/scripts/aesii/arc_batt.png",
@@ -146,6 +152,9 @@ local function loadArcBitmaps()
     }
 
     local fuelPaths = {
+        "images/fuel_base.png",
+        "scripts/aesii/images/fuel_base.png",
+        "/scripts/aesii/images/fuel_base.png",
         "fuel_base.png",
         "scripts/aesii/fuel_base.png",
         "/scripts/aesii/fuel_base.png",
@@ -222,6 +231,9 @@ local function loadLabelBitmap(name)
 
     local filename = "label_" .. name .. ".png"
     local paths = {
+        "images/" .. filename,
+        "scripts/aesii/images/" .. filename,
+        "/scripts/aesii/images/" .. filename,
         filename,
         "scripts/aesii/" .. filename,
         "/scripts/aesii/" .. filename
@@ -321,6 +333,9 @@ local function loadGlyph(sizeName, styleName, char)
     end
 
     local paths = {
+        "images/" .. name,
+        "scripts/aesii/images/" .. name,
+        "/scripts/aesii/images/" .. name,
         name,
         "scripts/aesii/" .. name,
         "/scripts/aesii/" .. name
@@ -1718,17 +1733,23 @@ local function paint(widget)
         }
     )
 
+    local annunciatorW = 102
+    local annunciatorGap = 10
+    local annunciatorY = topY + 210
+    local annunciatorX =
+        w / 2 - annunciatorW - annunciatorGap / 2
+
     ignitionAnnunciator(
-        w / 2 - 104,
-        topY + 210,
-        74,
+        annunciatorX,
+        annunciatorY,
+        annunciatorW,
         ignitionEnabled
     )
 
     modeAnnunciator(
-        w / 2 - 10,
-        topY + 210,
-        136,
+        annunciatorX + annunciatorW + annunciatorGap,
+        annunciatorY,
+        annunciatorW,
         modeState
     )
 end
