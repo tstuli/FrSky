@@ -33,7 +33,7 @@ DIM = (42, 49, 58, 255)
 LABEL = (155, 172, 186, 255)
 WHITE = (255, 255, 255, 255)
 
-FONT_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz./- "
+FONT_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ./- "
 FONT_VARIANTS = {
     "label": LABEL,
     "white": WHITE,
@@ -46,6 +46,30 @@ FONT_SPECS = {
     "value": {"size": 24, "w": 17, "h": 28, "y": -2},
     "rpm": {"size": 31, "w": 20, "h": 35, "y": -3},
 }
+FONT_GENERATION = {
+    "small": {
+        "chars": FONT_CHARS,
+        "variants": ("label", "green", "yellow"),
+    },
+    "value": {
+        "chars": "0123456789.-CV",
+        "variants": ("green", "yellow", "red", "white"),
+    },
+    "rpm": {
+        "chars": "0123456789-",
+        "variants": ("red",),
+    },
+}
+LABEL_ASSETS = (
+    ("rpm", "RPM", "small", "label"),
+    ("ff_ml_min", "FF ML/MIN", "small", "label"),
+    ("fuel_ml", "FUEL ML", "small", "label"),
+    ("ign_label", "IGN", "small", "label"),
+    ("ign_green", "IGN", "small", "green"),
+    ("off_label", "OFF", "small", "label"),
+    ("gyro_yellow", "GYRO", "small", "yellow"),
+    ("stab_green", "STAB", "small", "green"),
+)
 FONT_PATHS = (
     "/System/Library/Fonts/HelveticaNeue.ttc",
     "/System/Library/Fonts/Helvetica.ttc",
@@ -258,11 +282,18 @@ def get_font(size):
 
 def make_font_glyphs():
     for font_name, spec in FONT_SPECS.items():
+        generation = FONT_GENERATION.get(font_name)
+
+        if generation is None:
+            continue
+
         scale = FONT_RENDER_SCALE
         font = get_font(spec["size"] * scale)
 
-        for variant_name, color in FONT_VARIANTS.items():
-            for char in FONT_CHARS:
+        for variant_name in generation["variants"]:
+            color = FONT_VARIANTS[variant_name]
+
+            for char in generation["chars"]:
                 if char == " ":
                     continue
 
@@ -302,6 +333,53 @@ def make_font_glyphs():
                 image.save(os.path.join(OUT_DIR, filename))
 
 
+def render_text_asset(path, text, font_name, variant_name):
+    spec = FONT_SPECS[font_name]
+    scale = FONT_RENDER_SCALE
+    font = get_font(spec["size"] * scale)
+    color = FONT_VARIANTS[variant_name]
+    spacing = 1 * scale
+    glyph_w = spec["w"] * scale
+    glyph_h = spec["h"] * scale
+    width = len(text) * glyph_w + max(0, len(text) - 1) * spacing
+    image = Image.new("RGBA", (width, glyph_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+
+    for index, char in enumerate(text):
+        if char == " ":
+            continue
+
+        bbox = draw.textbbox((0, 0), char, font=font)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+        cell_x = index * (glyph_w + spacing)
+        text_x = cell_x + (glyph_w - text_w) // 2 - bbox[0]
+        text_y = (glyph_h - text_h) // 2 - bbox[1] + spec["y"] * scale
+
+        draw.text(
+            (text_x, text_y),
+            char,
+            font=font,
+            fill=color,
+        )
+
+    image = image.resize(
+        (max(1, width // scale), spec["h"]),
+        Image.Resampling.LANCZOS,
+    )
+    image.save(path)
+
+
+def make_label_assets():
+    for name, text, font_name, variant_name in LABEL_ASSETS:
+        render_text_asset(
+            os.path.join(OUT_DIR, "label_" + name + ".png"),
+            text,
+            font_name,
+            variant_name,
+        )
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     make(
@@ -322,6 +400,7 @@ def main():
     )
     make_fuel_base(os.path.join(OUT_DIR, "fuel_base.png"))
 
+    make_label_assets()
     make_font_glyphs()
 
 

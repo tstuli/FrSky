@@ -46,6 +46,7 @@ local FUEL_BITMAP_H = 70
 local arcTempBitmap = nil
 local arcBattBitmap = nil
 local fuelBaseBitmap = nil
+local labelBitmaps = {}
 local spriteFontBitmaps = {}
 local arcBitmapLoadAttempted = false
 
@@ -210,6 +211,67 @@ local function drawBitmapAt(bitmapValue, x, y)
     return false
 end
 
+local function loadLabelBitmap(name)
+    if labelBitmaps[name] ~= nil then
+        if labelBitmaps[name] == false then
+            return nil
+        end
+
+        return labelBitmaps[name]
+    end
+
+    local filename = "label_" .. name .. ".png"
+    local paths = {
+        filename,
+        "scripts/aesii/" .. filename,
+        "/scripts/aesii/" .. filename
+    }
+
+    for _, path in ipairs(paths) do
+        local loaded = tryLoadBitmap(path)
+
+        if loaded ~= nil then
+            labelBitmaps[name] = loaded
+            return loaded
+        end
+    end
+
+    labelBitmaps[name] = false
+    return nil
+end
+
+local LABEL_SIZES = {
+    rpm = {w = 35, h = 20},
+    ff_ml_min = {w = 107, h = 20},
+    fuel_ml = {w = 83, h = 20},
+    ign_label = {w = 35, h = 20},
+    ign_green = {w = 35, h = 20},
+    off_label = {w = 35, h = 20},
+    gyro_yellow = {w = 47, h = 20},
+    stab_green = {w = 47, h = 20}
+}
+
+local function drawLabelBitmap(name, x, y, align)
+    local bitmapValue = loadLabelBitmap(name)
+
+    if bitmapValue == nil then
+        return false
+    end
+
+    local spec = LABEL_SIZES[name]
+    local drawX = round(x)
+
+    if spec ~= nil then
+        if align == "right" or (RIGHT ~= nil and align == RIGHT) then
+            drawX = drawX - spec.w
+        elseif align == "center" or (CENTER ~= nil and align == CENTER) then
+            drawX = drawX - math.floor(spec.w / 2)
+        end
+    end
+
+    return drawBitmapAt(bitmapValue, drawX, round(y))
+end
+
 local function drawArcBitmap(bitmapValue, centerX, centerY)
     return drawBitmapAt(
         bitmapValue,
@@ -368,6 +430,66 @@ local function formatValue(value, decimals, unit)
     return text
 end
 
+local function formattedTelemetryKey(widget)
+    local cht1Min = widget.t1_min or 10
+    local cht1Max = widget.t1_max or 150
+    local cht2Min = widget.t2_min or 10
+    local cht2Max = widget.t2_max or 150
+    local bat1Min = widget.v1_min or 6.0
+    local bat1Max = widget.v1_max or 8.4
+    local bat2Min = widget.v2_min or 6.0
+    local bat2Max = widget.v2_max or 8.4
+    local rpmMax = widget.rpm_max or 8500
+    local flowMax = widget.ff_max or 100
+    local fuelCapacity = widget.fuel_cap or 1000
+
+    if cht1Min == 0 then
+        cht1Min = 10
+    end
+
+    if cht2Min == 0 then
+        cht2Min = 10
+    end
+
+    local cht1 = getVal(widget.temp1)
+    local cht2 = getVal(widget.temp2)
+    local bat1 = getVal(widget.volt1)
+    local bat2 = getVal(widget.volt2)
+    local rpm = getVal(widget.rpm)
+    local fuelFlow = getVal(widget.fuel_flow)
+    local fuelRemaining = getVal(widget.fuel_remaining)
+    local ignitionEnabled = getVal(widget.ignition)
+    local modeState = getVal(widget.mode_state)
+
+    return table.concat({
+        widget.kind or "dashboard",
+        widget.cht1_label or "CHT1",
+        widget.cht2_label or "CHT2",
+        widget.bat1_label or "BAT1",
+        widget.bat2_label or "BAT2",
+        formatValue(cht1, 0, "C"),
+        formatValue(cht2, 0, "C"),
+        formatValue(bat1, 2, "V"),
+        formatValue(bat2, 2, "V"),
+        rpm == nil and "---" or string.format("%d", round(rpm)),
+        formatValue(fuelFlow, 1, nil),
+        formatValue(fuelRemaining, 0, nil),
+        formatValue(cht1Min, 0, nil),
+        formatValue(cht1Max, 0, nil),
+        formatValue(cht2Min, 0, nil),
+        formatValue(cht2Max, 0, nil),
+        formatValue(bat1Min, 2, nil),
+        formatValue(bat1Max, 2, nil),
+        formatValue(bat2Min, 2, nil),
+        formatValue(bat2Max, 2, nil),
+        formatValue(rpmMax, 0, nil),
+        formatValue(flowMax, 1, nil),
+        formatValue(fuelCapacity, 0, nil),
+        ignitionEnabled ~= nil and ignitionEnabled > 0 and "IGN1" or "IGN0",
+        modeState == nil and "MODnil" or string.format("MOD%d", round(modeState))
+    }, "|")
+end
+
 local function centeredText(x, y, text, color)
     if drawSpriteText("small", x, y, text, color or COL_TEXT, "center") then
         return
@@ -379,6 +501,34 @@ local function centeredText(x, y, text, color)
     else
         lcd.drawText(round(x - (#text * 3)), round(y), text)
     end
+end
+
+local function fuelLabelBitmapName(label)
+    if label == "FF ML/MIN" then
+        return "ff_ml_min"
+    elseif label == "FUEL ML" then
+        return "fuel_ml"
+    end
+
+    return nil
+end
+
+local function annunciatorLabelBitmapName(label, activeColor, active)
+    if label == "IGN" then
+        if active and activeColor == COL_GREEN then
+            return "ign_green"
+        end
+
+        return "ign_label"
+    elseif label == "OFF" then
+        return "off_label"
+    elseif label == "GYRO" and active and activeColor == COL_YELLOW then
+        return "gyro_yellow"
+    elseif label == "STAB" and active and activeColor == COL_GREEN then
+        return "stab_green"
+    end
+
+    return nil
 end
 
 local TINY_DIGITS = {
@@ -886,12 +1036,14 @@ local function rpmBox(x, y, w, h, rpm, maxRpm)
         39
     )
 
-    centeredText(
-        x + w / 2,
-        y + 7,
-        "RPM",
-        COL_LABEL
-    )
+    if not drawLabelBitmap("rpm", x + w / 2, y + 7, "center") then
+        centeredText(
+            x + w / 2,
+            y + 7,
+            "RPM",
+            COL_LABEL
+        )
+    end
 
     local rpmText = "---"
 
@@ -1101,13 +1253,18 @@ local function fuelStrip(
         )
     end
 
-    if not drawSpriteText(
-        "small",
-        x + 4,
-        y + 4,
-        label,
-        COL_LABEL
-    ) then
+    local labelBitmapName = fuelLabelBitmapName(label)
+
+    if not (
+        labelBitmapName ~= nil and
+        drawLabelBitmap(labelBitmapName, x + 4, y + 4)
+    ) and not drawSpriteText(
+            "small",
+            x + 4,
+            y + 4,
+            label,
+            COL_LABEL
+        ) then
         lcd.color(COL_LABEL)
         lcd.drawText(
             round(x + 4),
@@ -1235,13 +1392,19 @@ local function annunciatorLamp(x, y, w, label, activeColor, active, stateText)
         8
     )
 
-    if not drawSpriteText(
-        "small",
-        x + 38,
-        y + 3,
-        label,
-        labelColor
-    ) then
+    local labelBitmapName =
+        annunciatorLabelBitmapName(label, activeColor, active)
+
+    if not (
+        labelBitmapName ~= nil and
+        drawLabelBitmap(labelBitmapName, x + 38, y + 3)
+    ) and not drawSpriteText(
+            "small",
+            x + 38,
+            y + 3,
+            label,
+            labelColor
+        ) then
         lcd.color(labelColor)
         lcd.drawText(round(x + 38), round(y + 5), label)
     end
@@ -1764,8 +1927,16 @@ end
 local function wakeup(widget)
     local now = os.clock() * 1000
 
-    if now - lastTime >= INTERVAL then
-        lastTime = now
+    if now - lastTime < INTERVAL then
+        return
+    end
+
+    lastTime = now
+
+    local renderKey = formattedTelemetryKey(widget)
+
+    if widget._lastRenderKey ~= renderKey then
+        widget._lastRenderKey = renderKey
         lcd.invalidate()
     end
 end
