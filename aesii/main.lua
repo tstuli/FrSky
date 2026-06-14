@@ -56,6 +56,11 @@ local bitmapDrawMethod = nil
 ------------------------------------------------------------
 local lastTime = 0
 local INTERVAL = 100
+local QUANTIZE_CHT = 1
+local QUANTIZE_BATTERY = 0.05
+local QUANTIZE_RPM = 25
+local QUANTIZE_FUEL_FLOW = 1
+local QUANTIZE_FUEL_REMAINING = 5
 
 ------------------------------------------------------------
 -- HELPERS
@@ -426,6 +431,38 @@ local function getVal(source)
     return nil
 end
 
+local function quantizeValue(value, step)
+    if value == nil then
+        return nil
+    end
+
+    if step == nil or step <= 0 then
+        return value
+    end
+
+    return round(value / step) * step
+end
+
+local function readTelemetrySnapshot(widget)
+    return {
+        cht1 = quantizeValue(getVal(widget.temp1), QUANTIZE_CHT),
+        cht2 = quantizeValue(getVal(widget.temp2), QUANTIZE_CHT),
+        bat1 = quantizeValue(getVal(widget.volt1), QUANTIZE_BATTERY),
+        bat2 = quantizeValue(getVal(widget.volt2), QUANTIZE_BATTERY),
+        rpm = quantizeValue(getVal(widget.rpm), QUANTIZE_RPM),
+        fuelFlow = quantizeValue(
+            getVal(widget.fuel_flow),
+            QUANTIZE_FUEL_FLOW
+        ),
+        fuelRemaining = quantizeValue(
+            getVal(widget.fuel_remaining),
+            QUANTIZE_FUEL_REMAINING
+        ),
+        ignitionEnabled = getVal(widget.ignition),
+        modeState = getVal(widget.mode_state)
+    }
+end
+
 local function zoneColor(position, zones)
     if zones ~= nil then
         for _, zone in ipairs(zones) do
@@ -453,7 +490,7 @@ local function formatValue(value, decimals, unit)
     return text
 end
 
-local function formattedTelemetryKey(widget)
+local function formattedTelemetryKey(widget, telemetry)
     local cht1Min = widget.t1_min or 10
     local cht1Max = widget.t1_max or 150
     local cht2Min = widget.t2_min or 10
@@ -474,15 +511,16 @@ local function formattedTelemetryKey(widget)
         cht2Min = 10
     end
 
-    local cht1 = getVal(widget.temp1)
-    local cht2 = getVal(widget.temp2)
-    local bat1 = getVal(widget.volt1)
-    local bat2 = getVal(widget.volt2)
-    local rpm = getVal(widget.rpm)
-    local fuelFlow = getVal(widget.fuel_flow)
-    local fuelRemaining = getVal(widget.fuel_remaining)
-    local ignitionEnabled = getVal(widget.ignition)
-    local modeState = getVal(widget.mode_state)
+    local snapshot = telemetry or readTelemetrySnapshot(widget)
+    local cht1 = snapshot.cht1
+    local cht2 = snapshot.cht2
+    local bat1 = snapshot.bat1
+    local bat2 = snapshot.bat2
+    local rpm = snapshot.rpm
+    local fuelFlow = snapshot.fuelFlow
+    local fuelRemaining = snapshot.fuelRemaining
+    local ignitionEnabled = snapshot.ignitionEnabled
+    local modeState = snapshot.modeState
 
     return table.concat({
         widget.kind or "dashboard",
@@ -1409,18 +1447,25 @@ local function paint(widget)
     --------------------------------------------------------
     -- Telemetry
     --------------------------------------------------------
-    local cht1 = getVal(widget.temp1)
-    local cht2 = getVal(widget.temp2)
+    local telemetry = widget._telemetrySnapshot
 
-    local bat1 = getVal(widget.volt1)
-    local bat2 = getVal(widget.volt2)
+    if telemetry == nil then
+        telemetry = readTelemetrySnapshot(widget)
+        widget._telemetrySnapshot = telemetry
+    end
 
-    local rpm = getVal(widget.rpm)
+    local cht1 = telemetry.cht1
+    local cht2 = telemetry.cht2
 
-    local fuelFlow = getVal(widget.fuel_flow)
-    local fuelRemaining = getVal(widget.fuel_remaining)
-    local ignitionEnabled = getVal(widget.ignition)
-    local modeState = getVal(widget.mode_state)
+    local bat1 = telemetry.bat1
+    local bat2 = telemetry.bat2
+
+    local rpm = telemetry.rpm
+
+    local fuelFlow = telemetry.fuelFlow
+    local fuelRemaining = telemetry.fuelRemaining
+    local ignitionEnabled = telemetry.ignitionEnabled
+    local modeState = telemetry.modeState
 
     --------------------------------------------------------
     -- Configuration
@@ -1867,9 +1912,11 @@ local function wakeup(widget)
 
     lastTime = now
 
-    local renderKey = formattedTelemetryKey(widget)
+    local telemetry = readTelemetrySnapshot(widget)
+    local renderKey = formattedTelemetryKey(widget, telemetry)
 
     if widget._lastRenderKey ~= renderKey then
+        widget._telemetrySnapshot = telemetry
         widget._lastRenderKey = renderKey
         lcd.invalidate()
     end
@@ -2198,6 +2245,7 @@ local function read(widget)
     end
 
     widget._lastRenderKey = nil
+    widget._telemetrySnapshot = nil
 end
 
 local function write(widget)
