@@ -12,7 +12,7 @@
 -- pixelation from individual radial lines.
 
 local function name()
-    return "AES"
+    return "AES-II"
 end
 
 ------------------------------------------------------------
@@ -34,15 +34,19 @@ local COL_YELLOW   = lcd.RGB(255, 210, 0)
 local COL_RED      = lcd.RGB(250, 55, 55)
 
 local FONT_SMALL = SMLSIZE or 0
+local FONT_RPM = DBLSIZE or MIDSIZE or 0
 
 local ARC_BITMAP_SIZE = 192
 local ARC_BITMAP_CENTER_X = 96
 local ARC_BITMAP_CENTER_Y = 113
 local RPM_BITMAP_W = 175
 local RPM_BITMAP_H = 90
+local FUEL_BITMAP_W = 180
+local FUEL_BITMAP_H = 70
 local arcTempBitmap = nil
 local arcBattBitmap = nil
 local rpmBaseBitmap = nil
+local fuelBaseBitmap = nil
 local rpmDigitBitmaps = {}
 local arcBitmapLoadAttempted = false
 
@@ -124,19 +128,37 @@ local function loadArcBitmaps()
     local tempPaths = {
         "arc_temp.png",
         "scripts/aesii/arc_temp.png",
-        "/scripts/aesii/arc_temp.png"
+        "/scripts/aesii/arc_temp.png",
+        "scripts/aestemp/arc_temp.png",
+        "/scripts/aestemp/arc_temp.png",
+        "scripts/aescht2/arc_temp.png",
+        "/scripts/aescht2/arc_temp.png"
     }
 
     local battPaths = {
         "arc_batt.png",
         "scripts/aesii/arc_batt.png",
-        "/scripts/aesii/arc_batt.png"
+        "/scripts/aesii/arc_batt.png",
+        "scripts/aesbatt/arc_batt.png",
+        "/scripts/aesbatt/arc_batt.png",
+        "scripts/aesbat2/arc_batt.png",
+        "/scripts/aesbat2/arc_batt.png"
     }
 
     local rpmPaths = {
         "rpm_base.png",
         "scripts/aesii/rpm_base.png",
-        "/scripts/aesii/rpm_base.png"
+        "/scripts/aesii/rpm_base.png",
+        "scripts/aesrpm/rpm_base.png",
+        "/scripts/aesrpm/rpm_base.png"
+    }
+
+    local fuelPaths = {
+        "fuel_base.png",
+        "scripts/aesii/fuel_base.png",
+        "/scripts/aesii/fuel_base.png",
+        "scripts/aesfuel/fuel_base.png",
+        "/scripts/aesfuel/fuel_base.png"
     }
 
     for _, path in ipairs(tempPaths) do
@@ -163,6 +185,14 @@ local function loadArcBitmaps()
         end
     end
 
+    for _, path in ipairs(fuelPaths) do
+        fuelBaseBitmap = tryLoadBitmap(path)
+
+        if fuelBaseBitmap ~= nil then
+            break
+        end
+    end
+
     for _, char in ipairs({
         "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "-"
     }) do
@@ -175,7 +205,9 @@ local function loadArcBitmaps()
         local paths = {
             "rpm_" .. suffix .. ".png",
             "scripts/aesii/rpm_" .. suffix .. ".png",
-            "/scripts/aesii/rpm_" .. suffix .. ".png"
+            "/scripts/aesii/rpm_" .. suffix .. ".png",
+            "scripts/aesrpm/rpm_" .. suffix .. ".png",
+            "/scripts/aesrpm/rpm_" .. suffix .. ".png"
         }
 
         for _, path in ipairs(paths) do
@@ -272,7 +304,11 @@ end
 
 local function centeredText(x, y, text, color)
     lcd.color(color or COL_TEXT)
-    lcd.drawText(round(x), round(y), text, CENTER)
+    if CENTER ~= nil then
+        lcd.drawText(round(x), round(y), text, CENTER)
+    else
+        lcd.drawText(round(x - (#text * 3)), round(y), text)
+    end
 end
 
 local TINY_DIGITS = {
@@ -309,39 +345,27 @@ local function tinyTextWidth(text, scale)
 end
 
 local function drawTinyText(x, y, text, color, flags)
-    local scale = 3
     local drawX = round(x)
+    local charWidth = 6
 
-    if flags == RIGHT then
-        drawX = drawX - tinyTextWidth(text, scale)
-    elseif flags == CENTER then
-        drawX = drawX - math.floor(tinyTextWidth(text, scale) / 2)
+    if FONT_SMALL == 0 then
+        charWidth = 7
+    end
+
+    local width = #text * charWidth
+
+    if RIGHT ~= nil and flags == RIGHT then
+        drawX = drawX - width
+    elseif CENTER ~= nil and flags == CENTER then
+        drawX = drawX - math.floor(width / 2)
     end
 
     lcd.color(color or COL_LABEL)
 
-    for i = 1, #text do
-        local char = string.sub(text, i, i)
-        local pattern = TINY_DIGITS[char]
-
-        if pattern ~= nil then
-            for row = 1, 5 do
-                local bits = pattern[row]
-
-                for col = 1, 3 do
-                    if string.sub(bits, col, col) == "1" then
-                        lcd.drawFilledRectangle(
-                            drawX + (col - 1) * scale,
-                            round(y) + (row - 1) * scale,
-                            scale,
-                            scale
-                        )
-                    end
-                end
-            end
-
-            drawX = drawX + 4 * scale
-        end
+    if FONT_SMALL ~= 0 then
+        lcd.drawText(drawX, round(y), text, FONT_SMALL)
+    else
+        lcd.drawText(drawX, round(y), text)
     end
 end
 
@@ -383,37 +407,20 @@ local function drawSegmentDigit(x, y, char, color)
 end
 
 local function drawRpmValue(x, y, text, color)
-    local digitW = 24
-    local digitH = 42
-    local fallbackDigitW = 15
-    local fallbackDigitH = 28
-    local gap = 5
-    local width = #text * digitW + (#text - 1) * gap
-    local drawX = round(x - width / 2)
+    local charWidth = 12
 
-    for i = 1, #text do
-        local char = string.sub(text, i, i)
-        local bitmapValue = rpmDigitBitmaps[char]
-        local drawn = false
+    if FONT_RPM ~= 0 then
+        charWidth = 17
+    end
 
-        if bitmapValue ~= nil then
-            drawn = drawBitmapAt(
-                bitmapValue,
-                drawX,
-                round(y)
-            )
-        end
+    local drawX = round(x - (#text * charWidth) / 2)
 
-        if not drawn then
-            drawSegmentDigit(
-                drawX + math.floor((digitW - fallbackDigitW) / 2),
-                round(y + (digitH - fallbackDigitH) / 2),
-                char,
-                color
-            )
-        end
+    lcd.color(color)
 
-        drawX = drawX + digitW + gap
+    if FONT_RPM ~= 0 then
+        lcd.drawText(drawX, round(y), text, FONT_RPM)
+    else
+        lcd.drawText(drawX, round(y), text)
     end
 end
 
@@ -609,8 +616,8 @@ local function semiGauge(
 )
     local position = valuePercent(value, minValue, maxValue)
 
-    local startAngle = 205
-    local endAngle = 325
+    local startAngle = 195
+    local endAngle = 335
     local sweep = endAngle - startAngle
 
     local thickness = math.floor(
@@ -622,7 +629,7 @@ local function semiGauge(
     --------------------------------------------------------
     -- Range arc
     --------------------------------------------------------
-    if not drawArcBitmap(arcBitmap, centerX, centerY) then
+    if radius < 72 or not drawArcBitmap(arcBitmap, centerX, centerY) then
         for angle = startAngle, endAngle, segmentStep do
             local segmentPosition =
                 (angle - startAngle) / sweep
@@ -664,7 +671,7 @@ local function semiGauge(
 
     drawTinyText(
         round(centerX + math.cos(minLabelAngle) * minLabelRadius - 3),
-        round(centerY + math.sin(minLabelAngle) * minLabelRadius + 14),
+        round(centerY + math.sin(minLabelAngle) * minLabelRadius + 9),
         formatValue(minValue, decimals, nil),
         COL_LABEL
     )
@@ -674,7 +681,7 @@ local function semiGauge(
 
     drawTinyText(
         round(centerX + math.cos(maxLabelAngle) * maxLabelRadius + 18),
-        round(centerY + math.sin(maxLabelAngle) * maxLabelRadius + 13),
+        round(centerY + math.sin(maxLabelAngle) * maxLabelRadius + 8),
         formatValue(maxValue, decimals, nil),
         COL_LABEL,
         RIGHT
@@ -791,7 +798,7 @@ local function rpmBox(x, y, w, h, rpm, maxRpm)
             round(h)
         )
 
-        lcd.color(COL_CYAN)
+        lcd.color(COL_BORDER)
         lcd.drawRectangle(
             round(x),
             round(y),
@@ -832,24 +839,45 @@ local function rpmBox(x, y, w, h, rpm, maxRpm)
     -- RPM load bar
     --------------------------------------------------------
     local barX = x + 14
-    local barY = y + h - 18
+    local barY = y + h - 16
     local barW = w - 28
+    local idlePosition = valuePercent(1200, 0, maxRpm)
+    local idleX = barX + barW * idlePosition
+    local markerX = barX + barW * position
 
-    lcd.color(COL_DIM)
-    lcd.drawFilledRectangle(
+    lcd.color(COL_WHITE)
+    lcd.drawLine(
         round(barX),
         round(barY),
-        round(barW),
-        5
+        round(barX + barW),
+        round(barY)
     )
 
-    lcd.color(valueColor)
+    lcd.color(COL_GREEN)
     lcd.drawFilledRectangle(
-        round(barX),
-        round(barY),
-        round(barW * position),
-        5
+        round(idleX - 1),
+        round(barY - 7),
+        3,
+        14
     )
+
+    if rpm ~= nil then
+        lcd.color(valueColor)
+        lcd.drawFilledRectangle(
+            round(markerX - 2),
+            round(barY - 9),
+            4,
+            18
+        )
+
+        lcd.color(COL_WHITE)
+        lcd.drawLine(
+            round(markerX - 6),
+            round(barY - 11),
+            round(markerX + 6),
+            round(barY - 11)
+        )
+    end
 end
 
 ------------------------------------------------------------
@@ -986,74 +1014,81 @@ local function fuelStrip(
         valueColor = zoneColor(position, zones)
     end
 
-    lcd.color(COL_BORDER)
-    local stripH = 31
-
-    lcd.drawRectangle(
+    local baseDrawn = drawBitmapAt(
+        fuelBaseBitmap,
         round(x),
-        round(y),
-        round(w),
-        stripH
+        round(y)
     )
+
+    if not baseDrawn then
+        lcd.color(COL_BG)
+        lcd.drawFilledRectangle(
+            round(x),
+            round(y),
+            round(w),
+            FUEL_BITMAP_H
+        )
+
+        lcd.color(COL_BORDER)
+        lcd.drawRectangle(
+            round(x),
+            round(y),
+            round(w),
+            FUEL_BITMAP_H
+        )
+
+        lcd.color(COL_WHITE)
+        lcd.drawLine(
+            round(x + 10),
+            round(y + 43),
+            round(x + 114),
+            round(y + 43)
+        )
+    end
 
     lcd.color(COL_LABEL)
     lcd.drawText(
         round(x + 4),
-        round(y + 2),
+        round(y + 4),
         label
     )
 
     lcd.color(valueColor)
     lcd.drawText(
-        round(x + w - 4),
-        round(y + 2),
+        round(x + w - 6),
+        round(y + 5),
         formatValue(value, decimals, unit),
         RIGHT
     )
 
-    local lineY = y + 23
-    local lineX = x + 8
-    local lineW = w - 16
-
-    lcd.color(COL_WHITE)
-    lcd.drawLine(
-        round(lineX),
-        round(lineY),
-        round(lineX + lineW),
-        round(lineY)
-    )
-
-    lcd.drawLine(
-        round(lineX),
-        round(lineY - 6),
-        round(lineX),
-        round(lineY + 6)
-    )
-
-    lcd.drawLine(
-        round(lineX + lineW),
-        round(lineY - 6),
-        round(lineX + lineW),
-        round(lineY + 6)
-    )
-
+    local lineY = y + 43
+    local lineX = x + 10
+    local lineW = 104
     local markerX = lineX + lineW * position
 
     lcd.color(valueColor)
     lcd.drawFilledRectangle(
         round(markerX - 2),
-        round(lineY - 7),
-        5,
-        14
+        round(lineY - 10),
+        4,
+        20
     )
 
     lcd.color(COL_WHITE)
     lcd.drawLine(
-        round(markerX - 4),
-        round(lineY - 8),
-        round(markerX + 4),
-        round(lineY - 8)
+        round(markerX - 7),
+        round(lineY - 12),
+        round(markerX + 7),
+        round(lineY - 12)
     )
+
+    lcd.drawText(
+        round(x + w - 8),
+        round(y + 35),
+        formatValue(maxValue, decimals, unit),
+        RIGHT
+    )
+
 end
 
 ------------------------------------------------------------
@@ -1101,7 +1136,7 @@ local function paint(widget)
     local bat2Min = widget.v2_min or 6.0
     local bat2Max = widget.v2_max or 8.4
 
-    local rpmMax = widget.rpm_max or 12000
+    local rpmMax = widget.rpm_max or 8500
     local flowMax = widget.ff_max or 100
     local fuelCapacity = widget.fuel_cap or 1000
 
@@ -1270,9 +1305,9 @@ local function paint(widget)
     -- Fuel section
     --------------------------------------------------------
     fuelStrip(
-        w / 2 - 84,
-        topY + 50,
-        168,
+        w / 2 - FUEL_BITMAP_W / 2,
+        topY + 52,
+        FUEL_BITMAP_W,
         "FF mL/min",
         fuelFlow,
         0,
@@ -1286,9 +1321,9 @@ local function paint(widget)
     )
 
     fuelStrip(
-        w / 2 - 84,
-        topY + 100,
-        168,
+        w / 2 - FUEL_BITMAP_W / 2,
+        topY + 126,
+        FUEL_BITMAP_W,
         "FUEL mL",
         fuelRemaining,
         0,
@@ -1301,6 +1336,194 @@ local function paint(widget)
             {0.30, 1.00, COL_GREEN}
         }
     )
+end
+
+------------------------------------------------------------
+-- DASHBOARD WIDGET PAINTERS
+------------------------------------------------------------
+local function preparePanel()
+    local w, h = lcd.getWindowSize()
+
+    loadArcBitmaps()
+
+    lcd.color(COL_BG)
+    lcd.drawFilledRectangle(0, 0, w, h)
+
+    lcd.color(COL_PANEL)
+    lcd.drawFilledRectangle(2, 2, w - 4, h - 4)
+
+    lcd.color(COL_BORDER)
+    lcd.drawRectangle(2, 2, w - 4, h - 4)
+
+    return w, h
+end
+
+local function dashboardGaugeLayout(w, h)
+    local radius = math.floor(
+        clamp(math.min(w * 0.35, h * 0.72), 42, 77)
+    )
+
+    local cy = math.floor(h * 0.42)
+    local valueY = math.floor(h * 0.58)
+    local labelY = valueY + 17
+
+    return radius, cy, valueY, labelY
+end
+
+local function paintTemperatureGauge(widget, gaugeIndex)
+    local w, h = preparePanel()
+    local radius, cy, valueY, labelY = dashboardGaugeLayout(w, h)
+
+    local minValue = widget.t1_min or 10
+    local maxValue = widget.t1_max or 150
+    local source = widget.temp1
+    local label = widget.cht1_label or "CHT1"
+
+    if gaugeIndex == 2 then
+        minValue = widget.t2_min or 10
+        maxValue = widget.t2_max or 150
+        source = widget.temp2
+        label = widget.cht2_label or "CHT2"
+    end
+
+    if minValue == 0 then minValue = 10 end
+
+    local yellow = thresholdPercent(90, minValue, maxValue)
+    local red = thresholdPercent(100, minValue, maxValue)
+
+    semiGauge(
+        w * 0.50,
+        cy,
+        radius,
+        getVal(source),
+        minValue,
+        maxValue,
+        label,
+        "C",
+        0,
+        {
+            {0.00, yellow, COL_GREEN},
+            {yellow, red, COL_YELLOW},
+            {red, 1.00, COL_RED}
+        },
+        labelY,
+        valueY,
+        arcTempBitmap
+    )
+end
+
+local function paintBatteryGauge(widget, gaugeIndex)
+    local w, h = preparePanel()
+    local radius, cy, valueY, labelY = dashboardGaugeLayout(w, h)
+
+    local minValue = widget.v1_min or 6.0
+    local maxValue = widget.v1_max or 8.4
+    local source = widget.volt1
+    local label = widget.bat1_label or "BAT1"
+
+    if gaugeIndex == 2 then
+        minValue = widget.v2_min or 6.0
+        maxValue = widget.v2_max or 8.4
+        source = widget.volt2
+        label = widget.bat2_label or "BAT2"
+    end
+
+    local red = thresholdPercent(7.2, minValue, maxValue)
+    local yellow = thresholdPercent(7.6, minValue, maxValue)
+
+    semiGauge(
+        w * 0.50,
+        cy,
+        radius,
+        getVal(source),
+        minValue,
+        maxValue,
+        label,
+        "V",
+        2,
+        {
+            {0.00, red, COL_RED},
+            {red, yellow, COL_YELLOW},
+            {yellow, 1.00, COL_GREEN}
+        },
+        labelY,
+        valueY,
+        arcBattBitmap
+    )
+end
+
+local function paintRpm(widget)
+    local w, h = preparePanel()
+    local x = math.floor((w - RPM_BITMAP_W) / 2)
+    local y = math.floor((h - RPM_BITMAP_H) / 2)
+
+    rpmBox(
+        x,
+        y,
+        RPM_BITMAP_W,
+        RPM_BITMAP_H,
+        getVal(widget.rpm),
+        widget.rpm_max or 8500
+    )
+end
+
+local function paintFuel(widget)
+    local w, h = preparePanel()
+    local x = math.floor((w - FUEL_BITMAP_W) / 2)
+    local gap = 8
+    local totalH = FUEL_BITMAP_H * 2 + gap
+    local y = math.floor((h - totalH) / 2)
+
+    fuelStrip(
+        x,
+        y,
+        FUEL_BITMAP_W,
+        "FF mL/min",
+        getVal(widget.fuel_flow),
+        0,
+        widget.ff_max or 100,
+        nil,
+        1,
+        {
+            {0.00, 0.80, COL_GREEN},
+            {0.80, 1.00, COL_YELLOW}
+        }
+    )
+
+    fuelStrip(
+        x,
+        y + FUEL_BITMAP_H + gap,
+        FUEL_BITMAP_W,
+        "FUEL mL",
+        getVal(widget.fuel_remaining),
+        0,
+        widget.fuel_cap or 1000,
+        nil,
+        0,
+        {
+            {0.00, 0.15, COL_RED},
+            {0.15, 0.30, COL_YELLOW},
+            {0.30, 1.00, COL_GREEN}
+        }
+    )
+end
+
+local function paintDashboard(widget)
+    if widget.kind == "temp1" then
+        paintTemperatureGauge(widget, 1)
+    elseif widget.kind == "temp2" then
+        paintTemperatureGauge(widget, 2)
+    elseif widget.kind == "bat1" then
+        paintBatteryGauge(widget, 1)
+    elseif widget.kind == "bat2" then
+        paintBatteryGauge(widget, 2)
+    elseif widget.kind == "rpm" then
+        paintRpm(widget)
+    elseif widget.kind == "fuel" then
+        paintFuel(widget)
+    else
+        paint(widget)
+    end
 end
 
 ------------------------------------------------------------
@@ -1373,6 +1596,10 @@ local function configure(widget)
         )
     end
 
+    local kind = widget.kind
+    local showAll = kind == nil
+
+    if showAll or kind == "temp1" then
     --------------------------------------------------------
     -- CHT 1
     --------------------------------------------------------
@@ -1406,7 +1633,9 @@ local function configure(widget)
         1000,
         0
     )
+    end
 
+    if showAll or kind == "temp2" then
     --------------------------------------------------------
     -- CHT 2
     --------------------------------------------------------
@@ -1440,7 +1669,9 @@ local function configure(widget)
         1000,
         0
     )
+    end
 
+    if showAll or kind == "bat1" then
     --------------------------------------------------------
     -- Battery 1
     --------------------------------------------------------
@@ -1474,7 +1705,9 @@ local function configure(widget)
         60,
         2
     )
+    end
 
+    if showAll or kind == "bat2" then
     --------------------------------------------------------
     -- Battery 2
     --------------------------------------------------------
@@ -1508,7 +1741,9 @@ local function configure(widget)
         60,
         2
     )
+    end
 
+    if showAll or kind == "rpm" then
     --------------------------------------------------------
     -- RPM
     --------------------------------------------------------
@@ -1522,12 +1757,14 @@ local function configure(widget)
     bindNumber(
         "RPM Maximum",
         "rpm_max",
-        12000,
+        8500,
         0,
         30000,
         0
     )
+    end
 
+    if showAll or kind == "fuel" then
     --------------------------------------------------------
     -- Fuel
     --------------------------------------------------------
@@ -1560,6 +1797,7 @@ local function configure(widget)
         20000,
         0
     )
+    end
 end
 
 ------------------------------------------------------------

@@ -4,14 +4,14 @@ import struct
 import zlib
 
 
-OUT_DIR = (
-    "/Users/taruntuli/Documents/Ethos Simulator/26.1.0-RC4/"
-    "persist/X20PROAW/scripts/aesii"
-)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+OUT_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "aesii"))
 
 SIZE = 192
 RPM_W = 175
 RPM_H = 90
+FUEL_W = 180
+FUEL_H = 70
 RPM_DIGIT_W = 24
 RPM_DIGIT_H = 42
 SCALE = 4
@@ -213,16 +213,33 @@ def make_rpm_base(path):
     img = [[(0, 0, 0, 0) for _ in range(width)] for _ in range(height)]
 
     fill_rect(img, 0, 0, width, height, BOX)
-    stroke_rect(img, 0, 0, width, height, CYAN, 2 * SCALE)
-    stroke_rect(img, 4 * SCALE, 4 * SCALE, width - 8 * SCALE, height - 8 * SCALE, (0, 92, 112, 255), SCALE)
+    stroke_rect(img, 0, 0, width, height, (66, 78, 92, 255), SCALE)
+    stroke_rect(img, 4 * SCALE, 4 * SCALE, width - 8 * SCALE, height - 8 * SCALE, (26, 34, 43, 255), SCALE)
 
     fill_rect(img, 12 * SCALE, 26 * SCALE, width - 24 * SCALE, 38 * SCALE, DARK)
     stroke_rect(img, 12 * SCALE, 26 * SCALE, width - 24 * SCALE, 38 * SCALE, (20, 34, 44, 255), SCALE)
 
-    fill_rect(img, 14 * SCALE, 72 * SCALE, width - 28 * SCALE, 5 * SCALE, DIM)
-    fill_rect(img, 14 * SCALE, 80 * SCALE, width - 28 * SCALE, SCALE, (2, 125, 160, 255))
+    fill_rect(img, 14 * SCALE, 74 * SCALE, width - 28 * SCALE, SCALE, (238, 242, 244, 255))
 
     write_png(path, downsample(img, RPM_W, RPM_H))
+
+
+def make_fuel_base(path):
+    width = FUEL_W * SCALE
+    height = FUEL_H * SCALE
+    img = [[(0, 0, 0, 0) for _ in range(width)] for _ in range(height)]
+
+    fill_rect(img, 0, 0, width, height, DARK)
+    stroke_rect(img, 0, 0, width, height, (36, 47, 58, 255), SCALE)
+
+    line_y = 43 * SCALE
+    line_x = 10 * SCALE
+    line_w = 104 * SCALE
+    fill_rect(img, line_x, line_y, line_w, 2 * SCALE, (238, 242, 244, 255))
+    fill_rect(img, line_x, line_y - 8 * SCALE, 2 * SCALE, 16 * SCALE, RED)
+    fill_rect(img, line_x + line_w - 2 * SCALE, line_y - 2 * SCALE, 2 * SCALE, 4 * SCALE, (238, 242, 244, 255))
+
+    write_png(path, downsample(img, FUEL_W, FUEL_H))
 
 
 SEGMENTS = {
@@ -240,109 +257,24 @@ SEGMENTS = {
 }
 
 
-def point_in_poly(px, py, points):
-    inside = False
-    j = len(points) - 1
-
-    for i, point in enumerate(points):
-        xi, yi = point
-        xj, yj = points[j]
-
-        if ((yi > py) != (yj > py)) and (
-            px < (xj - xi) * (py - yi) / (yj - yi) + xi
-        ):
-            inside = not inside
-
-        j = i
-
-    return inside
-
-
-def fill_poly_aa(img, points, color):
-    samples = 4
-    sample_count = samples * samples
-    min_x = max(0, int(math.floor(min(p[0] for p in points))))
-    max_x = min(len(img[0]) - 1, int(math.ceil(max(p[0] for p in points))))
-    min_y = max(0, int(math.floor(min(p[1] for p in points))))
-    max_y = min(len(img) - 1, int(math.ceil(max(p[1] for p in points))))
-
-    for y in range(min_y, max_y + 1):
-        for x in range(min_x, max_x + 1):
-            coverage = 0
-
-            for sy in range(samples):
-                for sx in range(samples):
-                    if point_in_poly(
-                        x + (sx + 0.5) / samples,
-                        y + (sy + 0.5) / samples,
-                        points,
-                    ):
-                        coverage += 1
-
-            if coverage:
-                img[y][x] = blend_over(
-                    img[y][x],
-                    color,
-                    coverage / sample_count,
-                )
-
-
 def draw_segment(img, name, color):
     w = RPM_DIGIT_W * SCALE
     h = RPM_DIGIT_H * SCALE
-    t = 6 * SCALE
-    inset = 3 * SCALE
-    slant = 3 * SCALE
-    mid = h / 2
+    t = 5 * SCALE
+    inset = 4 * SCALE
+    mid = h // 2
 
     segments = {
-        "a": [
-            (inset + slant, inset),
-            (w - inset - slant, inset),
-            (w - inset - 2 * slant, inset + t),
-            (inset + 2 * slant, inset + t),
-        ],
-        "b": [
-            (w - inset - t, inset + slant),
-            (w - inset, inset + 2 * slant),
-            (w - inset, mid - slant),
-            (w - inset - t, mid - t / 2),
-        ],
-        "c": [
-            (w - inset - t, mid + t / 2),
-            (w - inset, mid + slant),
-            (w - inset, h - inset - 2 * slant),
-            (w - inset - t, h - inset - slant),
-        ],
-        "d": [
-            (inset + 2 * slant, h - inset - t),
-            (w - inset - 2 * slant, h - inset - t),
-            (w - inset - slant, h - inset),
-            (inset + slant, h - inset),
-        ],
-        "e": [
-            (inset, mid + slant),
-            (inset + t, mid + t / 2),
-            (inset + t, h - inset - slant),
-            (inset, h - inset - 2 * slant),
-        ],
-        "f": [
-            (inset, inset + 2 * slant),
-            (inset + t, inset + slant),
-            (inset + t, mid - t / 2),
-            (inset, mid - slant),
-        ],
-        "g": [
-            (inset + 2 * slant, mid - t / 2),
-            (w - inset - 2 * slant, mid - t / 2),
-            (w - inset - slant, mid),
-            (w - inset - 2 * slant, mid + t / 2),
-            (inset + 2 * slant, mid + t / 2),
-            (inset + slant, mid),
-        ],
+        "a": (inset + t, inset, w - 2 * (inset + t), t),
+        "b": (w - inset - t, inset + t, t, mid - inset - t),
+        "c": (w - inset - t, mid + t, t, h - mid - inset - 2 * t),
+        "d": (inset + t, h - inset - t, w - 2 * (inset + t), t),
+        "e": (inset, mid + t, t, h - mid - inset - 2 * t),
+        "f": (inset, inset + t, t, mid - inset - t),
+        "g": (inset + t, mid, w - 2 * (inset + t), t),
     }
 
-    fill_poly_aa(img, segments[name], color)
+    fill_rect(img, *segments[name], color)
 
 
 def make_rpm_digit(path, char):
@@ -377,6 +309,7 @@ def main():
         ],
     )
     make_rpm_base(os.path.join(OUT_DIR, "rpm_base.png"))
+    make_fuel_base(os.path.join(OUT_DIR, "fuel_base.png"))
 
     for char in "0123456789-":
         suffix = "dash" if char == "-" else char
