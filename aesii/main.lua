@@ -21,7 +21,7 @@ end
 local COL_BG       = lcd.RGB(8, 10, 14)
 local COL_PANEL    = lcd.RGB(17, 21, 28)
 local COL_BOX      = lcd.RGB(23, 28, 36)
-local COL_BORDER   = lcd.RGB(66, 78, 92)
+local COL_BORDER   = lcd.RGB(54, 66, 78)
 local COL_DIM      = lcd.RGB(42, 49, 58)
 
 local COL_TEXT     = lcd.RGB(245, 247, 250)
@@ -790,24 +790,16 @@ local function rpmBox(x, y, w, h, rpm, maxRpm)
     )
 
     if not baseDrawn then
-        lcd.color(COL_BOX)
-        lcd.drawFilledRectangle(
-            round(x),
-            round(y),
-            round(w),
-            round(h)
-        )
-
-        lcd.color(COL_BORDER)
-        lcd.drawRectangle(
-            round(x),
-            round(y),
-            round(w),
-            round(h)
-        )
-
         lcd.color(COL_BG)
         lcd.drawFilledRectangle(
+            round(x + 12),
+            round(y + 26),
+            round(w - 24),
+            38
+        )
+
+        lcd.color(COL_DIM)
+        lcd.drawRectangle(
             round(x + 12),
             round(y + 26),
             round(w - 24),
@@ -1021,22 +1013,6 @@ local function fuelStrip(
     )
 
     if not baseDrawn then
-        lcd.color(COL_BG)
-        lcd.drawFilledRectangle(
-            round(x),
-            round(y),
-            round(w),
-            FUEL_BITMAP_H
-        )
-
-        lcd.color(COL_BORDER)
-        lcd.drawRectangle(
-            round(x),
-            round(y),
-            round(w),
-            FUEL_BITMAP_H
-        )
-
         lcd.color(COL_WHITE)
         lcd.drawLine(
             round(x + 10),

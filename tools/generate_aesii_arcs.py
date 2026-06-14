@@ -212,12 +212,8 @@ def make_rpm_base(path):
     height = RPM_H * SCALE
     img = [[(0, 0, 0, 0) for _ in range(width)] for _ in range(height)]
 
-    fill_rect(img, 0, 0, width, height, BOX)
-    stroke_rect(img, 0, 0, width, height, (66, 78, 92, 255), SCALE)
-    stroke_rect(img, 4 * SCALE, 4 * SCALE, width - 8 * SCALE, height - 8 * SCALE, (26, 34, 43, 255), SCALE)
-
-    fill_rect(img, 12 * SCALE, 26 * SCALE, width - 24 * SCALE, 38 * SCALE, DARK)
-    stroke_rect(img, 12 * SCALE, 26 * SCALE, width - 24 * SCALE, 38 * SCALE, (20, 34, 44, 255), SCALE)
+    fill_rect(img, 12 * SCALE, 26 * SCALE, width - 24 * SCALE, 38 * SCALE, (2, 4, 6, 245))
+    stroke_rect(img, 12 * SCALE, 26 * SCALE, width - 24 * SCALE, 38 * SCALE, (30, 40, 48, 255), SCALE)
 
     fill_rect(img, 14 * SCALE, 74 * SCALE, width - 28 * SCALE, SCALE, (238, 242, 244, 255))
 
@@ -228,9 +224,6 @@ def make_fuel_base(path):
     width = FUEL_W * SCALE
     height = FUEL_H * SCALE
     img = [[(0, 0, 0, 0) for _ in range(width)] for _ in range(height)]
-
-    fill_rect(img, 0, 0, width, height, DARK)
-    stroke_rect(img, 0, 0, width, height, (36, 47, 58, 255), SCALE)
 
     line_y = 43 * SCALE
     line_x = 10 * SCALE
