@@ -9,20 +9,20 @@ from PIL import Image, ImageDraw, ImageFont
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "aesii"))
 
-SIZE = 192
-RPM_W = 175
+SIZE = 216
+RPM_W = 205
 RPM_H = 90
-FUEL_W = 180
+FUEL_W = 210
 FUEL_H = 70
 RPM_DIGIT_W = 24
 RPM_DIGIT_H = 42
 SCALE = 4
 W = SIZE * SCALE
 H = SIZE * SCALE
-CENTER_X = 96 * SCALE
-CENTER_Y = 113 * SCALE
-RADIUS = 77 * SCALE
-THICKNESS = 14 * SCALE
+CENTER_X = 108 * SCALE
+CENTER_Y = 127 * SCALE
+RADIUS = 88 * SCALE
+THICKNESS = 16 * SCALE
 START_DEG = 195
 END_DEG = 335
 
@@ -239,10 +239,10 @@ def make_rpm_base(path):
     height = RPM_H * SCALE
     img = [[(0, 0, 0, 0) for _ in range(width)] for _ in range(height)]
 
-    fill_rect(img, 12 * SCALE, 26 * SCALE, width - 24 * SCALE, 38 * SCALE, (2, 4, 6, 245))
-    stroke_rect(img, 12 * SCALE, 26 * SCALE, width - 24 * SCALE, 38 * SCALE, (30, 40, 48, 255), SCALE)
+    fill_rect(img, 15 * SCALE, 25 * SCALE, width - 30 * SCALE, 39 * SCALE, (2, 4, 6, 245))
+    stroke_rect(img, 15 * SCALE, 25 * SCALE, width - 30 * SCALE, 39 * SCALE, (30, 40, 48, 255), SCALE)
 
-    fill_rect(img, 14 * SCALE, 74 * SCALE, width - 28 * SCALE, SCALE, (238, 242, 244, 255))
+    fill_rect(img, 16 * SCALE, 74 * SCALE, width - 32 * SCALE, SCALE, (238, 242, 244, 255))
 
     write_png(path, downsample(img, RPM_W, RPM_H))
 
@@ -254,7 +254,7 @@ def make_fuel_base(path):
 
     line_y = 43 * SCALE
     line_x = 10 * SCALE
-    line_w = 104 * SCALE
+    line_w = 130 * SCALE
     fill_rect(img, line_x, line_y, line_w, 2 * SCALE, (238, 242, 244, 255))
     fill_rect(img, line_x, line_y - 8 * SCALE, 2 * SCALE, 16 * SCALE, RED)
     fill_rect(img, line_x + line_w - 2 * SCALE, line_y - 2 * SCALE, 2 * SCALE, 4 * SCALE, (238, 242, 244, 255))

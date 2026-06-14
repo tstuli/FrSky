@@ -36,12 +36,12 @@ local COL_RED      = lcd.RGB(250, 55, 55)
 local FONT_SMALL = SMLSIZE or 0
 local FONT_RPM = DBLSIZE or MIDSIZE or 0
 
-local ARC_BITMAP_SIZE = 192
-local ARC_BITMAP_CENTER_X = 96
-local ARC_BITMAP_CENTER_Y = 113
-local RPM_BITMAP_W = 175
+local ARC_BITMAP_SIZE = 216
+local ARC_BITMAP_CENTER_X = 108
+local ARC_BITMAP_CENTER_Y = 127
+local RPM_BITMAP_W = 205
 local RPM_BITMAP_H = 90
-local FUEL_BITMAP_W = 180
+local FUEL_BITMAP_W = 210
 local FUEL_BITMAP_H = 70
 local arcTempBitmap = nil
 local arcBattBitmap = nil
@@ -960,18 +960,18 @@ local function rpmBox(x, y, w, h, rpm, maxRpm)
     if not baseDrawn then
         lcd.color(COL_BG)
         lcd.drawFilledRectangle(
-            round(x + 12),
-            round(y + 26),
-            round(w - 24),
-            38
+            round(x + 15),
+            round(y + 25),
+            round(w - 30),
+            39
         )
 
         lcd.color(COL_DIM)
         lcd.drawRectangle(
-            round(x + 12),
-            round(y + 26),
-            round(w - 24),
-            38
+            round(x + 15),
+            round(y + 25),
+            round(w - 30),
+            39
         )
     end
 
@@ -998,9 +998,9 @@ local function rpmBox(x, y, w, h, rpm, maxRpm)
     --------------------------------------------------------
     -- RPM load bar
     --------------------------------------------------------
-    local barX = x + 14
+    local barX = x + 16
     local barY = y + h - 16
-    local barW = w - 28
+    local barW = w - 32
     local idlePosition = valuePercent(1200, 0, maxRpm)
     local idleX = barX + barW * idlePosition
     local markerX = barX + barW * position
@@ -1185,7 +1185,7 @@ local function fuelStrip(
         lcd.drawLine(
             round(x + 10),
             round(y + 43),
-            round(x + 114),
+            round(x + 140),
             round(y + 43)
         )
     end
@@ -1234,7 +1234,7 @@ local function fuelStrip(
 
     local lineY = y + 43
     local lineX = x + 10
-    local lineW = 104
+    local lineW = 130
     local markerX = lineX + lineW * position
 
     lcd.color(valueColor)
@@ -1370,28 +1370,28 @@ local function paint(widget)
     -- Gauge geometry
     --------------------------------------------------------
     local sideX = math.floor(
-        clamp(w * 0.15, 90, 112)
+        clamp(w * 0.15, 96, 128)
     )
 
     local leftX = sideX
     local rightX = w - sideX
-    local chtLeftX = leftX - 8
-    local chtRightX = rightX + 8
+    local chtLeftX = leftX - 4
+    local chtRightX = rightX + 4
 
-    local topY = mainPanelY + 64
-    local chtY = topY + 18
-    local bottomY = h - 62
+    local topY = mainPanelY + 58
+    local chtY = topY + 30
+    local bottomY = h - 50
 
     local radius = math.floor(
-        clamp((bottomY - topY) / 2 + 12, 50, 77)
+        clamp((bottomY - topY) / 2 + 22, 60, 88)
     )
 
     local topLabelY = topY - 4
     local topValueY = topY + 18
-    local chtValueY = chtY - 6
+    local chtValueY = chtY + 18
     local chtLabelY = chtValueY + 19
-    local bottomValueY = bottomY + 8
-    local bottomLabelY = bottomValueY + 18
+    local bottomValueY = bottomY + 12
+    local bottomLabelY = bottomValueY + 19
 
     --------------------------------------------------------
     -- Temperature gauges
@@ -1484,7 +1484,7 @@ local function paint(widget)
     --------------------------------------------------------
     rpmBox(
         w / 2 - RPM_BITMAP_W / 2,
-        topY - 45,
+        topY - 48,
         RPM_BITMAP_W,
         RPM_BITMAP_H,
         rpm,
@@ -1496,7 +1496,7 @@ local function paint(widget)
     --------------------------------------------------------
     fuelStrip(
         w / 2 - FUEL_BITMAP_W / 2,
-        topY + 52,
+        topY + 54,
         FUEL_BITMAP_W,
         "FF mL/min",
         fuelFlow,
@@ -1512,7 +1512,7 @@ local function paint(widget)
 
     fuelStrip(
         w / 2 - FUEL_BITMAP_W / 2,
-        topY + 126,
+        topY + 132,
         FUEL_BITMAP_W,
         "FUEL mL",
         fuelRemaining,
