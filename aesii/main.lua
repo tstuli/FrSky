@@ -49,6 +49,7 @@ local fuelBaseBitmap = nil
 local labelBitmaps = {}
 local spriteFontBitmaps = {}
 local arcBitmapLoadAttempted = false
+local bitmapDrawMethod = nil
 
 ------------------------------------------------------------
 -- UPDATE TIMER
@@ -192,20 +193,43 @@ local function drawBitmapAt(bitmapValue, x, y)
         return false
     end
 
+    if bitmapDrawMethod == 1 then
+        lcd.drawBitmap(bitmapValue, x, y)
+        return true
+    elseif bitmapDrawMethod == 2 then
+        lcd.drawBitmap(x, y, bitmapValue)
+        return true
+    elseif bitmapDrawMethod == 3 then
+        lcd.drawImage(x, y, bitmapValue)
+        return true
+    elseif bitmapDrawMethod == 4 then
+        bitmapValue:draw(x, y)
+        return true
+    end
+
     if type(lcd.drawBitmap) == "function" then
         local ok = pcall(lcd.drawBitmap, bitmapValue, x, y)
 
-        if ok then return true end
+        if ok then
+            bitmapDrawMethod = 1
+            return true
+        end
 
         ok = pcall(lcd.drawBitmap, x, y, bitmapValue)
 
-        if ok then return true end
+        if ok then
+            bitmapDrawMethod = 2
+            return true
+        end
     end
 
     if type(lcd.drawImage) == "function" then
         local ok = pcall(lcd.drawImage, x, y, bitmapValue)
 
-        if ok then return true end
+        if ok then
+            bitmapDrawMethod = 3
+            return true
+        end
     end
 
     if type(bitmapValue) == "table" and
@@ -214,7 +238,10 @@ local function drawBitmapAt(bitmapValue, x, y)
             bitmapValue:draw(x, y)
         end)
 
-        if ok then return true end
+        if ok then
+            bitmapDrawMethod = 4
+            return true
+        end
     end
 
     return false
@@ -616,26 +643,34 @@ local function drawTinyText(x, y, text, color, flags)
     end
 end
 
-local function drawRpmValue(x, y, text, color)
-    if drawSpriteText("rpm", x, y, text, color or COL_TEXT, "center") then
-        return
-    end
+local function drawNativeText(x, y, text, color, font, align)
+    local drawX = round(x)
 
-    local charWidth = 12
+    lcd.color(color or COL_TEXT)
 
-    if FONT_RPM ~= 0 then
-        charWidth = 17
-    end
-
-    local drawX = round(x - (#text * charWidth) / 2)
-
-    lcd.color(color)
-
-    if FONT_RPM ~= 0 then
-        lcd.drawText(drawX, round(y), text, FONT_RPM)
+    if align == "right" or (RIGHT ~= nil and align == RIGHT) then
+        if RIGHT ~= nil then
+            lcd.drawText(drawX, round(y), text, (font or 0) + RIGHT)
+        else
+            lcd.drawText(drawX - (#text * 8), round(y), text, font or 0)
+        end
+    elseif align == "center" or (CENTER ~= nil and align == CENTER) then
+        if CENTER ~= nil then
+            lcd.drawText(drawX, round(y), text, (font or 0) + CENTER)
+        else
+            lcd.drawText(drawX - math.floor(#text * 4), round(y), text, font or 0)
+        end
     else
-        lcd.drawText(drawX, round(y), text)
+        lcd.drawText(drawX, round(y), text, font or 0)
     end
+end
+
+local function drawNativeValue(x, y, text, color, align)
+    drawNativeText(x, y, text, color, MIDSIZE or FONT_SMALL, align)
+end
+
+local function drawRpmValue(x, y, text, color)
+    drawNativeText(x, y, text, color or COL_TEXT, FONT_RPM, "center")
 end
 
 ------------------------------------------------------------
@@ -965,37 +1000,21 @@ local function semiGauge(
     end
 
     local valueText = formatValue(value, decimals, unit)
-    local valueX = centerX + radius * 0.17
+    local valueX = centerX + radius * 0.06
+    local labelX = centerX + radius * 0.11
     local valueDrawY = valueY or centerY + 12
 
-    if not drawSpriteText(
-        "value",
+    drawNativeValue(
         valueX,
-        valueDrawY,
+        valueDrawY + 1,
         valueText,
         valueColor,
         "center"
-    ) then
-        lcd.color(valueColor)
-        if CENTER ~= nil then
-            lcd.drawText(
-                round(valueX),
-                round(valueDrawY),
-                valueText,
-                CENTER
-            )
-        else
-            lcd.drawText(
-                round(valueX - (#valueText * 3)),
-                round(valueDrawY),
-                valueText
-            )
-        end
-    end
+    )
 
     if not drawSpriteText(
         "small",
-        valueX,
+        labelX,
         labelY or centerY + 31,
         label,
         COL_LABEL,
@@ -1004,14 +1023,14 @@ local function semiGauge(
         lcd.color(COL_LABEL)
         if CENTER ~= nil then
             lcd.drawText(
-                round(valueX),
+                round(labelX),
                 round(labelY or centerY + 31),
                 label,
                 CENTER
             )
         else
             lcd.drawText(
-                round(valueX - (#label * 3)),
+                round(labelX - (#label * 3)),
                 round(labelY or centerY + 31),
                 label
             )
@@ -1290,30 +1309,13 @@ local function fuelStrip(
 
     local stripValueText = formatValue(value, decimals, unit)
 
-    if not drawSpriteText(
-        "value",
+    drawNativeValue(
         x + w - 6,
-        y + 2,
+        y + 5,
         stripValueText,
         valueColor,
         "right"
-    ) then
-        lcd.color(valueColor)
-        if RIGHT ~= nil then
-            lcd.drawText(
-                round(x + w - 6),
-                round(y + 5),
-                stripValueText,
-                RIGHT
-            )
-        else
-            lcd.drawText(
-                round(x + w - 6 - (#stripValueText * 6)),
-                round(y + 5),
-                stripValueText
-            )
-        end
-    end
+    )
 
     local lineY = y + 43
     local lineX = x + 10
@@ -1594,10 +1596,10 @@ local function paint(widget)
 
     local topLabelY = topY - 4
     local topValueY = topY + 18
-    local chtValueY = chtY + 4
-    local chtLabelY = chtValueY + 19
-    local bottomValueY = bottomY + 6
-    local bottomLabelY = bottomValueY + 19
+    local chtValueY = chtY + 1
+    local chtLabelY = chtValueY + 23
+    local bottomValueY = bottomY + 3
+    local bottomLabelY = bottomValueY + 23
 
     --------------------------------------------------------
     -- Temperature gauges

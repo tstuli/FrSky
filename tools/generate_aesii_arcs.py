@@ -52,14 +52,6 @@ FONT_GENERATION = {
         "chars": FONT_CHARS,
         "variants": ("label", "green", "yellow"),
     },
-    "value": {
-        "chars": "0123456789.-CV",
-        "variants": ("green", "yellow", "red", "white"),
-    },
-    "rpm": {
-        "chars": "0123456789-",
-        "variants": ("red",),
-    },
 }
 LABEL_ASSETS = (
     ("rpm", "RPM", "small", "label"),
