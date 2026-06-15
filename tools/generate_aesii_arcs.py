@@ -62,9 +62,6 @@ FONT_GENERATION = {
     },
 }
 LABEL_ASSETS = (
-    ("rpm", "RPM", "small", "label"),
-    ("ff_ml_min", "FF ML/MIN", "small", "label"),
-    ("fuel_ml", "FUEL ML", "small", "label"),
     ("ign_label", "IGN", "small", "label"),
     ("ign_green", "IGN", "small", "green"),
     ("off_label", "OFF", "small", "label"),
@@ -308,21 +305,6 @@ def stroke_rect(img, x, y, w, h, color, thickness=1):
     fill_rect(img, x, y + h - thickness, w, thickness, color)
     fill_rect(img, x, y, thickness, h, color)
     fill_rect(img, x + w - thickness, y, thickness, h, color)
-
-
-def make_fuel_base(path):
-    width = FUEL_W * SCALE
-    height = FUEL_H * SCALE
-    img = [[(0, 0, 0, 0) for _ in range(width)] for _ in range(height)]
-
-    line_y = 43 * SCALE
-    line_x = 10 * SCALE
-    line_w = 130 * SCALE
-    fill_rect(img, line_x, line_y, line_w, 2 * SCALE, (238, 242, 244, 255))
-    fill_rect(img, line_x, line_y - 8 * SCALE, 2 * SCALE, 16 * SCALE, RED)
-    fill_rect(img, line_x + line_w - 2 * SCALE, line_y - 2 * SCALE, 2 * SCALE, 4 * SCALE, (238, 242, 244, 255))
-
-    write_png(path, downsample(img, FUEL_W, FUEL_H))
 
 
 def draw_label(draw, font, text, x, y, color):
@@ -604,7 +586,6 @@ def parse_args():
     parser.add_argument("--all", action="store_true", help="Regenerate every asset.")
     parser.add_argument("--arc-temp", action="store_true", help="Regenerate arc_temp.png.")
     parser.add_argument("--arc-batt", action="store_true", help="Regenerate arc_batt.png.")
-    parser.add_argument("--fuel-base", action="store_true", help="Regenerate fuel_base.png.")
     parser.add_argument("--fuel-remaining", action="store_true", help="Regenerate fuel_remaining.png.")
     parser.add_argument("--fuel-flow", action="store_true", help="Regenerate fuel_flow.png.")
     parser.add_argument("--rpm-base", action="store_true", help="Regenerate rpm_base.png.")
@@ -620,7 +601,6 @@ def main():
             args.all,
             args.arc_temp,
             args.arc_batt,
-            args.fuel_base,
             args.fuel_remaining,
             args.fuel_flow,
             args.rpm_base,
@@ -649,8 +629,6 @@ def main():
                 ((7.6 - 6.0) / (8.4 - 6.0), 1.00, GREEN),
             ],
         )
-    if not selected or args.all or args.fuel_base:
-        make_fuel_base(os.path.join(IMAGE_DIR, "fuel_base.png"))
     if not selected or args.all or args.fuel_remaining:
         make_fuel_remaining_base(os.path.join(IMAGE_DIR, "fuel_remaining.png"))
     if not selected or args.all or args.fuel_flow:

@@ -47,7 +47,6 @@ local FUEL_REMAINING_LINE_X = 9
 local FUEL_REMAINING_LINE_W = 170
 local arcTempBitmap = nil
 local arcBattBitmap = nil
-local fuelBaseBitmap = nil
 local fuelRemainingBitmap = nil
 local fuelFlowBitmap = nil
 local rpmBaseBitmap = nil
@@ -170,12 +169,6 @@ local function loadArcBitmaps()
         "/scripts/aesii/images/arc_batt.png"
     }
 
-    local fuelPaths = {
-        "images/fuel_base.png",
-        "scripts/aesii/images/fuel_base.png",
-        "/scripts/aesii/images/fuel_base.png"
-    }
-
     local fuelRemainingPaths = {
         "images/fuel_remaining.png",
         "scripts/aesii/images/fuel_remaining.png",
@@ -206,14 +199,6 @@ local function loadArcBitmaps()
         arcBattBitmap = tryLoadBitmap(path)
 
         if arcBattBitmap ~= nil then
-            break
-        end
-    end
-
-    for _, path in ipairs(fuelPaths) do
-        fuelBaseBitmap = tryLoadBitmap(path)
-
-        if fuelBaseBitmap ~= nil then
             break
         end
     end
@@ -335,9 +320,6 @@ local function loadLabelBitmap(name)
 end
 
 local LABEL_SIZES = {
-    rpm = {w = 35, h = 20},
-    ff_ml_min = {w = 107, h = 20},
-    fuel_ml = {w = 83, h = 20},
     ign_label = {w = 35, h = 20},
     ign_green = {w = 35, h = 20},
     off_label = {w = 35, h = 20},
@@ -642,16 +624,6 @@ local function centeredText(x, y, text, color)
     else
         lcd.drawText(round(x - (#text * 3)), round(y), text)
     end
-end
-
-local function fuelLabelBitmapName(label)
-    if label == "FF ML/MIN" then
-        return "ff_ml_min"
-    elseif label == "FUEL ML" then
-        return "fuel_ml"
-    end
-
-    return nil
 end
 
 local function annunciatorLabelBitmapName(label, activeColor, active)
@@ -1033,7 +1005,7 @@ local function semiGauge(
     end
 
     local valueText = formatValue(value, decimals, unit)
-    local valueX = centerX + radius * 0.06
+    local valueX = centerX + radius * 0.14
     local labelX = centerX + radius * 0.11
     local valueDrawY = valueY or centerY + 12
 
@@ -1313,7 +1285,7 @@ local function fuelStrip(
     end
 
     local baseDrawn = drawBitmapAt(
-        baseBitmap or fuelBaseBitmap,
+        baseBitmap,
         round(x),
         round(y)
     )
@@ -1329,21 +1301,16 @@ local function fuelStrip(
     end
 
     if faceStyle ~= "remaining" and faceStyle ~= "flow" then
-        local labelBitmapName = fuelLabelBitmapName(label)
-
-        if not (
-            labelBitmapName ~= nil and
-            drawLabelBitmap(labelBitmapName, x + 4, y + 4)
-        ) and not drawSpriteText(
+        if not drawSpriteText(
                 "small",
-                x + 4,
+                x - 11,
                 y + 4,
                 label,
                 COL_LABEL
             ) then
             lcd.color(COL_LABEL)
             lcd.drawText(
-                round(x + 4),
+                round(x - 11),
                 round(y + 4),
                 label
             )
@@ -1351,6 +1318,16 @@ local function fuelStrip(
     end
 
     local stripValueText = formatValue(value, decimals, unit)
+
+    if faceStyle == "remaining" then
+        local numericValue = tonumber(value)
+
+        if numericValue == nil then
+            stripValueText = "---"
+        else
+            stripValueText = formatValue(numericValue / 10, 0, "%")
+        end
+    end
 
     if faceStyle ~= "remaining" and faceStyle ~= "flow" then
         drawSmallValue(
@@ -1418,7 +1395,7 @@ local function fuelStrip(
         end
 
         drawSmallValue(
-            x + w - 2,
+            x + w + 10,
             lineY - 10,
             stripValueText,
             valueColor,
@@ -2069,7 +2046,9 @@ local function paintFuel(widget)
         {
             {0.00, 0.80, COL_GREEN},
             {0.80, 1.00, COL_YELLOW}
-        }
+        },
+        fuelFlowBitmap,
+        "flow"
     )
 
     fuelStrip(
