@@ -18,6 +18,8 @@ FUEL_REMAINING_W = 182
 FUEL_REMAINING_H = 70
 FUEL_FLOW_W = 182
 FUEL_FLOW_H = 70
+RPM_W = 205
+RPM_H = 104
 SCALE = 4
 W = SIZE * SCALE
 H = SIZE * SCALE
@@ -448,6 +450,42 @@ def make_fuel_flow_base(path):
     img.save(path)
 
 
+def make_rpm_base(path):
+    width = RPM_W * SCALE
+    height = RPM_H * SCALE
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    font = get_font(16 * SCALE)
+    shadow = (46, 52, 60, 200)
+
+    line_x = 18 * SCALE
+    line_y = 52 * SCALE
+    line_w = 169 * SCALE
+    line_h = 3 * SCALE
+
+    draw_label(draw, font, "RPM", width // 2, 10 * SCALE, LABEL)
+
+    draw.rectangle(
+        [line_x, line_y, line_x + line_w, line_y + line_h],
+        fill=(238, 242, 244, 255),
+    )
+    draw.rectangle(
+        [line_x, line_y + 2 * SCALE, line_x + line_w, line_y + line_h + 2 * SCALE],
+        fill=shadow,
+    )
+    draw.rectangle(
+        [line_x, line_y - 7 * SCALE, line_x + 2 * SCALE, line_y + 9 * SCALE],
+        fill=WHITE,
+    )
+    draw.rectangle(
+        [line_x + line_w - 2 * SCALE, line_y - 7 * SCALE, line_x + line_w, line_y + 9 * SCALE],
+        fill=WHITE,
+    )
+
+    img = img.resize((RPM_W, RPM_H), Image.Resampling.LANCZOS)
+    img.save(path)
+
+
 def get_font(size):
     for path in FONT_PATHS:
         if os.path.exists(path):
@@ -569,6 +607,7 @@ def parse_args():
     parser.add_argument("--fuel-base", action="store_true", help="Regenerate fuel_base.png.")
     parser.add_argument("--fuel-remaining", action="store_true", help="Regenerate fuel_remaining.png.")
     parser.add_argument("--fuel-flow", action="store_true", help="Regenerate fuel_flow.png.")
+    parser.add_argument("--rpm-base", action="store_true", help="Regenerate rpm_base.png.")
     parser.add_argument("--labels", action="store_true", help="Regenerate label PNGs.")
     parser.add_argument("--fonts", action="store_true", help="Regenerate font glyph PNGs.")
     return parser.parse_args()
@@ -584,6 +623,7 @@ def main():
             args.fuel_base,
             args.fuel_remaining,
             args.fuel_flow,
+            args.rpm_base,
             args.labels,
             args.fonts,
         ]
@@ -615,6 +655,8 @@ def main():
         make_fuel_remaining_base(os.path.join(IMAGE_DIR, "fuel_remaining.png"))
     if not selected or args.all or args.fuel_flow:
         make_fuel_flow_base(os.path.join(IMAGE_DIR, "fuel_flow.png"))
+    if not selected or args.all or args.rpm_base:
+        make_rpm_base(os.path.join(IMAGE_DIR, "rpm_base.png"))
 
     if not selected or args.all or args.labels:
         make_label_assets()

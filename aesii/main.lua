@@ -40,7 +40,7 @@ local ARC_BITMAP_SIZE = 216
 local ARC_BITMAP_CENTER_X = 108
 local ARC_BITMAP_CENTER_Y = 127
 local RPM_BITMAP_W = 205
-local RPM_BITMAP_H = 90
+local RPM_BITMAP_H = 104
 local FUEL_BITMAP_W = 210
 local FUEL_BITMAP_H = 70
 local FUEL_REMAINING_LINE_X = 9
@@ -50,6 +50,7 @@ local arcBattBitmap = nil
 local fuelBaseBitmap = nil
 local fuelRemainingBitmap = nil
 local fuelFlowBitmap = nil
+local rpmBaseBitmap = nil
 local labelBitmaps = {}
 local spriteFontBitmaps = {}
 local arcBitmapLoadAttempted = false
@@ -70,6 +71,12 @@ local QUANTIZE_FUEL_REMAINING = 5
 -- HELPERS
 ------------------------------------------------------------
 local function round(v)
+    v = tonumber(v)
+
+    if v == nil then
+        return 0
+    end
+
     if v >= 0 then
         return math.floor(v + 0.5)
     end
@@ -78,13 +85,29 @@ local function round(v)
 end
 
 local function clamp(v, lo, hi)
+    v = tonumber(v)
+    lo = tonumber(lo)
+    hi = tonumber(hi)
+
+    if v == nil then
+        return lo or 0
+    end
+
+    if lo == nil then lo = v end
+    if hi == nil then hi = v end
+
     if v < lo then return lo end
     if v > hi then return hi end
     return v
 end
 
 local function valuePercent(value, minValue, maxValue)
+    value = tonumber(value)
+    minValue = tonumber(minValue)
+    maxValue = tonumber(maxValue)
+
     if value == nil then return 0 end
+    if minValue == nil or maxValue == nil then return 0 end
     if maxValue == minValue then return 0 end
 
     return clamp(
@@ -165,6 +188,12 @@ local function loadArcBitmaps()
         "/scripts/aesii/images/fuel_flow.png"
     }
 
+    local rpmBasePaths = {
+        "images/rpm_base.png",
+        "scripts/aesii/images/rpm_base.png",
+        "/scripts/aesii/images/rpm_base.png"
+    }
+
     for _, path in ipairs(tempPaths) do
         arcTempBitmap = tryLoadBitmap(path)
 
@@ -201,6 +230,14 @@ local function loadArcBitmaps()
         fuelFlowBitmap = tryLoadBitmap(path)
 
         if fuelFlowBitmap ~= nil then
+            break
+        end
+    end
+
+    for _, path in ipairs(rpmBasePaths) do
+        rpmBaseBitmap = tryLoadBitmap(path)
+
+        if rpmBaseBitmap ~= nil then
             break
         end
     end
@@ -512,8 +549,14 @@ local function formatValue(value, decimals, unit)
         return "---"
     end
 
+    local numericValue = tonumber(value)
+
+    if numericValue == nil then
+        return "---"
+    end
+
     local formatString = "%." .. tostring(decimals or 0) .. "f"
-    local text = string.format(formatString, value)
+    local text = string.format(formatString, numericValue)
 
     if unit ~= nil then
         text = text .. unit
@@ -532,6 +575,8 @@ local function formattedTelemetryKey(widget, telemetry)
     local bat2Min = widget.v2_min or 6.0
     local bat2Max = widget.v2_max or 8.4
     local rpmMax = widget.rpm_max or 8500
+    local rpmIdle = widget.rpm_idle or 800
+    local rpmRedline = widget.rpm_redline or 8000
     local flowMin = widget.ff_min or 0
     local flowMax = widget.ff_max or 100
     local fuelCapacity = widget.fuel_cap or 1000
@@ -577,8 +622,10 @@ local function formattedTelemetryKey(widget, telemetry)
         formatValue(bat2Min, 2, nil),
         formatValue(bat2Max, 2, nil),
         formatValue(rpmMax, 0, nil),
+        formatValue(rpmRedline, 0, nil),
         formatValue(flowMax, 1, nil),
         formatValue(fuelCapacity, 0, nil),
+        formatValue(rpmIdle, 0, nil),
         ignitionEnabled ~= nil and ignitionEnabled > 0 and "IGN1" or "IGN0",
         modeState == nil and "MODnil" or string.format("MOD%d", round(modeState))
     }, "|")
@@ -719,6 +766,10 @@ end
 
 local function drawNativeValue(x, y, text, color, align)
     drawNativeText(x, y, text, color, MIDSIZE or FONT_SMALL, align)
+end
+
+local function drawSmallValue(x, y, text, color, align)
+    drawNativeText(x, y, text, color, FONT_SMALL, align)
 end
 
 local function drawRpmValue(x, y, text, color)
@@ -1023,7 +1074,7 @@ end
 ------------------------------------------------------------
 -- LARGE BOXED RPM DISPLAY
 ------------------------------------------------------------
-local function rpmBox(x, y, w, h, rpm, maxRpm)
+local function rpmBox(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
     local position = valuePercent(rpm, 0, maxRpm)
 
     local valueColor = COL_RED
@@ -1036,85 +1087,88 @@ local function rpmBox(x, y, w, h, rpm, maxRpm)
         valueColor = COL_RED
     end
 
-    lcd.color(COL_BG)
-    lcd.drawFilledRectangle(
-        round(x + 15),
-        round(y + 25),
-        round(w - 30),
-        39
-    )
-
-    lcd.color(COL_DIM)
-    lcd.drawRectangle(
-        round(x + 15),
-        round(y + 25),
-        round(w - 30),
-        39
-    )
-
-    if not drawLabelBitmap("rpm", x + w / 2, y + 7, "center") then
-        centeredText(
-            x + w / 2,
-            y + 7,
-            "RPM",
-            COL_LABEL
-        )
-    end
-
     local rpmText = "---"
 
     if rpm ~= nil then
         rpmText = string.format("%d", rpm)
     end
 
-    drawRpmValue(
-        x + w / 2,
-        y + 28,
-        rpmText,
-        valueColor
+    drawBitmapAt(
+        rpmBaseBitmap,
+        round(x),
+        round(y)
     )
 
     --------------------------------------------------------
     -- RPM load bar
     --------------------------------------------------------
-    local barX = x + 16
-    local barY = y + h - 16
-    local barW = w - 32
-    local idlePosition = valuePercent(1200, 0, maxRpm)
+    local barX = x + 18
+    local barY = y + 58
+    local barW = 169
+    local idlePosition = valuePercent(idleRpm or 800, 0, maxRpm)
+    local redlinePosition = valuePercent(redlineRpm or 8000, 0, maxRpm)
     local idleX = barX + barW * idlePosition
+    local redlineX = barX + barW * redlinePosition
     local markerX = barX + barW * position
 
-    lcd.color(COL_WHITE)
-    lcd.drawLine(
-        round(barX),
-        round(barY),
-        round(barX + barW),
-        round(barY)
-    )
+    local rpmValueColor = COL_GREEN
+
+    if position >= redlinePosition then
+        rpmValueColor = COL_RED
+    elseif position >= idlePosition then
+        rpmValueColor = COL_YELLOW
+    end
 
     lcd.color(COL_GREEN)
     lcd.drawFilledRectangle(
         round(idleX - 1),
-        round(barY - 7),
-        3,
-        14
+        round(barY - 6),
+        2,
+        12
     )
+
+    local redlineStart = round(redlineX)
+    local redlineWidth = round(barX + barW) - redlineStart
+
+    if redlineWidth > 0 then
+        lcd.color(COL_RED)
+        lcd.drawFilledRectangle(
+            redlineStart,
+            round(barY - 1),
+            redlineWidth,
+            3
+        )
+    end
+
+    drawSmallValue(
+        x + w - 2,
+        barY - 10,
+        rpmText,
+        rpmValueColor,
+        "left"
+    )
+
+    local scaleLabelY = barY + 13
+    local minText = "0"
+    local maxText = tostring(round(maxRpm))
+    local minX = barX + 5
+    local maxX = barX + barW + 6
+
+    if not drawSpriteText("small", minX, scaleLabelY, minText, COL_LABEL, "right") then
+        drawNativeText(minX, scaleLabelY, minText, COL_LABEL, FONT_SMALL, "right")
+    end
+
+    if not drawSpriteText("small", maxX, scaleLabelY, maxText, COL_LABEL, "right") then
+        drawNativeText(maxX, scaleLabelY, maxText, COL_LABEL, FONT_SMALL, "right")
+    end
 
     if rpm ~= nil then
         lcd.color(valueColor)
         lcd.drawFilledRectangle(
             round(markerX - 2),
-            round(barY - 9),
+            round(barY - 8),
             4,
-            18
-        )
-
-        lcd.color(COL_WHITE)
-        lcd.drawLine(
-            round(markerX - 6),
-            round(barY - 11),
-            round(markerX + 6),
-            round(barY - 11)
+            16
         )
     end
 end
@@ -1299,12 +1353,12 @@ local function fuelStrip(
     local stripValueText = formatValue(value, decimals, unit)
 
     if faceStyle ~= "remaining" and faceStyle ~= "flow" then
-        drawNativeValue(
-            x + w - 6,
-            y + 5,
+        drawSmallValue(
+            x + w - 2,
+            y + 0,
             stripValueText,
             valueColor,
-            "right"
+            "left"
         )
     end
 
@@ -1362,6 +1416,14 @@ local function fuelStrip(
                 round(lineY + 1)
             )
         end
+
+        drawSmallValue(
+            x + w - 2,
+            lineY - 10,
+            stripValueText,
+            valueColor,
+            "left"
+        )
     end
 
     if faceStyle == "flow" then
@@ -1785,12 +1847,14 @@ local function paint(widget)
     -- RPM
     --------------------------------------------------------
     rpmBox(
-        w / 2 - RPM_BITMAP_W / 2,
+        w / 2 - RPM_BITMAP_W / 2 - 8,
         topY - 48,
         RPM_BITMAP_W,
         RPM_BITMAP_H,
         rpm,
-        rpmMax
+        rpmMax,
+        rpmIdle,
+        rpmRedline
     )
 
     --------------------------------------------------------
@@ -1970,7 +2034,7 @@ end
 
 local function paintRpm(widget)
     local w, h = preparePanel()
-    local x = math.floor((w - RPM_BITMAP_W) / 2)
+    local x = math.floor((w - RPM_BITMAP_W) / 2) - 8
     local y = math.floor((h - RPM_BITMAP_H) / 2)
 
     rpmBox(
@@ -1979,7 +2043,9 @@ local function paintRpm(widget)
         RPM_BITMAP_W,
         RPM_BITMAP_H,
         getVal(widget.rpm),
-        widget.rpm_max or 8500
+        widget.rpm_max or 8500,
+        widget.rpm_idle or 800,
+        widget.rpm_redline or 8000
     )
 end
 
@@ -2290,6 +2356,24 @@ local function configure(widget)
         30000,
         0
     )
+
+    bindNumber(
+        "RPM Idle",
+        "rpm_idle",
+        800,
+        0,
+        30000,
+        0
+    )
+
+    bindNumber(
+        "RPM Redline",
+        "rpm_redline",
+        8000,
+        0,
+        30000,
+        0
+    )
     end
 
     if showAll or kind == "fuel" then
@@ -2308,8 +2392,8 @@ local function configure(widget)
         "ff_min",
         0,
         0,
-        500,
-        1
+        1000,
+        0
     )
 
     bindNumber(
@@ -2317,8 +2401,8 @@ local function configure(widget)
         "ff_max",
         100,
         0,
-        500,
-        1
+        1000,
+        0
     )
 
     bindSource(
@@ -2382,8 +2466,11 @@ local PERSISTENT_FIELDS = {
 
     "rpm",
     "rpm_max",
+    "rpm_idle",
+    "rpm_redline",
 
     "fuel_flow",
+    "ff_min",
     "ff_max",
     "fuel_remaining",
     "fuel_cap",
