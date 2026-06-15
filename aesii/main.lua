@@ -1087,7 +1087,7 @@ local function rpmBox(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
 
     if position >= redlinePosition then
         rpmValueColor = COL_RED
-    elseif position >= idlePosition then
+    elseif position < idlePosition then
         rpmValueColor = COL_YELLOW
     end
 
@@ -1138,9 +1138,9 @@ local function rpmBox(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
         lcd.color(valueColor)
         lcd.drawFilledRectangle(
             round(markerX - 2),
-            round(barY - 4),
+            round(barY - 10),
             4,
-            8
+            20
         )
     end
 end
@@ -1395,7 +1395,7 @@ local function fuelStrip(
         end
 
         drawSmallValue(
-            x + w - 2,
+            x + w - 20,
             lineY - 10,
             stripValueText,
             valueColor,
