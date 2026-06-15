@@ -49,6 +49,7 @@ local arcTempBitmap = nil
 local arcBattBitmap = nil
 local fuelBaseBitmap = nil
 local fuelRemainingBitmap = nil
+local fuelFlowBitmap = nil
 local labelBitmaps = {}
 local spriteFontBitmaps = {}
 local arcBitmapLoadAttempted = false
@@ -158,6 +159,12 @@ local function loadArcBitmaps()
         "/scripts/aesii/images/fuel_remaining.png"
     }
 
+    local fuelFlowPaths = {
+        "images/fuel_flow.png",
+        "scripts/aesii/images/fuel_flow.png",
+        "/scripts/aesii/images/fuel_flow.png"
+    }
+
     for _, path in ipairs(tempPaths) do
         arcTempBitmap = tryLoadBitmap(path)
 
@@ -186,6 +193,14 @@ local function loadArcBitmaps()
         fuelRemainingBitmap = tryLoadBitmap(path)
 
         if fuelRemainingBitmap ~= nil then
+            break
+        end
+    end
+
+    for _, path in ipairs(fuelFlowPaths) do
+        fuelFlowBitmap = tryLoadBitmap(path)
+
+        if fuelFlowBitmap ~= nil then
             break
         end
     end
@@ -517,6 +532,7 @@ local function formattedTelemetryKey(widget, telemetry)
     local bat2Min = widget.v2_min or 6.0
     local bat2Max = widget.v2_max or 8.4
     local rpmMax = widget.rpm_max or 8500
+    local flowMin = widget.ff_min or 0
     local flowMax = widget.ff_max or 100
     local fuelCapacity = widget.fuel_cap or 1000
 
@@ -1225,10 +1241,13 @@ local function fuelStrip(
     baseBitmap,
     faceStyle
 )
+    local effectiveMin = minValue or 0
+    local effectiveMax = maxValue or effectiveMin
+
     local position = valuePercent(
         value,
-        minValue,
-        maxValue
+        effectiveMin,
+        effectiveMax
     )
 
     local valueColor
@@ -1255,7 +1274,7 @@ local function fuelStrip(
         )
     end
 
-    if faceStyle ~= "remaining" then
+    if faceStyle ~= "remaining" and faceStyle ~= "flow" then
         local labelBitmapName = fuelLabelBitmapName(label)
 
         if not (
@@ -1279,7 +1298,7 @@ local function fuelStrip(
 
     local stripValueText = formatValue(value, decimals, unit)
 
-    if faceStyle ~= "remaining" then
+    if faceStyle ~= "remaining" and faceStyle ~= "flow" then
         drawNativeValue(
             x + w - 6,
             y + 5,
@@ -1293,13 +1312,13 @@ local function fuelStrip(
     local lineX = x + 10
     local lineW = 130
 
-    if faceStyle == "remaining" then
+    if faceStyle == "remaining" or faceStyle == "flow" then
         lineY = y + 38
         lineX = x + FUEL_REMAINING_LINE_X
         lineW = FUEL_REMAINING_LINE_W
     end
 
-    if faceStyle == "remaining" then
+    if faceStyle == "remaining" or faceStyle == "flow" then
         local lastX = lineX
 
         if zones ~= nil then
@@ -1345,6 +1364,52 @@ local function fuelStrip(
         end
     end
 
+    if faceStyle == "flow" then
+        local labelY = lineY + 21
+        local minText = formatValue(round(effectiveMin), 0, unit)
+        local maxText = formatValue(round(effectiveMax), 0, unit)
+        local minX = lineX + 5
+        local maxX = lineX + lineW + 6
+
+        lcd.color(COL_LABEL)
+
+        if drawSpriteText("small", minX, labelY - 8, minText, COL_LABEL, "right") then
+            -- Sprite text handled the label.
+        elseif RIGHT ~= nil then
+            lcd.drawText(
+                round(minX),
+                round(labelY - 8),
+                minText,
+                RIGHT
+            )
+        else
+            lcd.drawText(
+                round(minX - (#minText * 6)),
+                round(labelY - 8),
+                minText
+            )
+        end
+
+        lcd.color(COL_LABEL)
+
+        if drawSpriteText("small", maxX, labelY - 10, maxText, COL_LABEL, "right") then
+            -- Sprite text handled the label.
+        elseif RIGHT ~= nil then
+            lcd.drawText(
+                round(maxX),
+                round(labelY - 10),
+                maxText,
+                RIGHT
+            )
+        else
+            lcd.drawText(
+                round(maxX - (#maxText * 6)),
+                round(labelY - 10),
+                maxText
+            )
+        end
+    end
+
     local markerPosition = clamp(position, 0, 1)
     local markerX = lineX + lineW * markerPosition
 
@@ -1356,15 +1421,7 @@ local function fuelStrip(
         20
     )
 
-    lcd.color(COL_WHITE)
-    lcd.drawLine(
-        round(markerX - 7),
-        round(lineY - 12),
-        round(markerX + 7),
-        round(lineY - 12)
-    )
-
-    if faceStyle == "remaining" then
+    if faceStyle == "remaining" or faceStyle == "flow" then
         return
     end
 
@@ -1745,14 +1802,16 @@ local function paint(widget)
         FUEL_BITMAP_W,
         "FF ML/MIN",
         fuelFlow,
-        0,
+        flowMin,
         flowMax,
         nil,
         1,
         {
             {0.00, 0.80, COL_GREEN},
             {0.80, 1.00, COL_YELLOW}
-        }
+        },
+        fuelFlowBitmap,
+        "flow"
     )
 
     fuelStrip(
@@ -1937,7 +1996,7 @@ local function paintFuel(widget)
         FUEL_BITMAP_W,
         "FF ML/MIN",
         getVal(widget.fuel_flow),
-        0,
+        widget.ff_min or 0,
         widget.ff_max or 100,
         nil,
         1,
@@ -2242,6 +2301,15 @@ local function configure(widget)
     bindSource(
         "Fuel Flow Source",
         "fuel_flow"
+    )
+
+    bindNumber(
+        "Flow Minimum",
+        "ff_min",
+        0,
+        0,
+        500,
+        1
     )
 
     bindNumber(
