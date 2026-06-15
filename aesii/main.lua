@@ -1103,7 +1103,7 @@ local function rpmBox(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
     -- RPM load bar
     --------------------------------------------------------
     local barX = x + 18
-    local barY = y + 58
+    local barY = y + 28
     local barW = 169
     local idlePosition = valuePercent(idleRpm or 800, 0, maxRpm)
     local redlinePosition = valuePercent(redlineRpm or 8000, 0, maxRpm)
@@ -1142,7 +1142,7 @@ local function rpmBox(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
 
     drawSmallValue(
         x + w - 2,
-        barY - 10,
+        barY - 9,
         rpmText,
         rpmValueColor,
         "left"
@@ -1847,7 +1847,7 @@ local function paint(widget)
     -- RPM
     --------------------------------------------------------
     rpmBox(
-        w / 2 - RPM_BITMAP_W / 2 - 8,
+        w / 2 - RPM_BITMAP_W / 2 - 13,
         topY - 48,
         RPM_BITMAP_W,
         RPM_BITMAP_H,
@@ -2034,7 +2034,7 @@ end
 
 local function paintRpm(widget)
     local w, h = preparePanel()
-    local x = math.floor((w - RPM_BITMAP_W) / 2) - 8
+    local x = math.floor((w - RPM_BITMAP_W) / 2) - 13
     local y = math.floor((h - RPM_BITMAP_H) / 2)
 
     rpmBox(

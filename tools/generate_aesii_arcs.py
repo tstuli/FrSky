@@ -207,7 +207,7 @@ def draw_arc(img, zones):
         t = step / (shadow_steps - 1)
         outer = shadow_outer - (shadow_depth * step / shadow_steps)
         band_thickness = max(2 * SCALE, math.ceil(shadow_depth / shadow_steps) + SCALE)
-        color = lerp_color((150, 156, 164, 255), (34, 38, 44, 255), t)
+        color = lerp_color((52, 56, 64, 255), (34, 38, 44, 255), t)
 
         draw_arc_band(
             img,
@@ -459,7 +459,7 @@ def make_rpm_base(path):
     shadow = (46, 52, 60, 200)
 
     line_x = 18 * SCALE
-    line_y = 52 * SCALE
+    line_y = 37 * SCALE
     line_w = 169 * SCALE
     line_h = 3 * SCALE
 
