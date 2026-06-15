@@ -40,7 +40,7 @@ local ARC_BITMAP_SIZE = 216
 local ARC_BITMAP_CENTER_X = 108
 local ARC_BITMAP_CENTER_Y = 127
 local RPM_BITMAP_W = 205
-local RPM_BITMAP_H = 104
+local RPM_BITMAP_H = 70
 local FUEL_BITMAP_W = 210
 local FUEL_BITMAP_H = 70
 local FUEL_REMAINING_LINE_X = 9
@@ -1303,14 +1303,14 @@ local function fuelStrip(
     if faceStyle ~= "remaining" and faceStyle ~= "flow" then
         if not drawSpriteText(
                 "small",
-                x - 11,
+                x - 41,
                 y + 4,
                 label,
                 COL_LABEL
             ) then
             lcd.color(COL_LABEL)
             lcd.drawText(
-                round(x - 11),
+                round(x - 41),
                 round(y + 4),
                 label
             )
@@ -1395,7 +1395,7 @@ local function fuelStrip(
         end
 
         drawSmallValue(
-            x + w + 10,
+            x + w - 2,
             lineY - 10,
             stripValueText,
             valueColor,

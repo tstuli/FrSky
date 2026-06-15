@@ -19,7 +19,7 @@ FUEL_REMAINING_H = 70
 FUEL_FLOW_W = 182
 FUEL_FLOW_H = 70
 RPM_W = 205
-RPM_H = 104
+RPM_H = 70
 SCALE = 4
 W = SIZE * SCALE
 H = SIZE * SCALE
@@ -369,7 +369,7 @@ def make_fuel_remaining_base(path):
     draw.rectangle([line_x + line_w - 3 * SCALE + SCALE, line_y - 7 * SCALE + SCALE, line_x + line_w + SCALE, line_y + 9 * SCALE + SCALE], fill=shadow)
     draw.rectangle([line_x + line_w - 3 * SCALE, line_y - 7 * SCALE, line_x + line_w, line_y + 9 * SCALE], fill=GREEN)
 
-    draw_label(draw, font, "FUEL QTY", width // 2, 12 * SCALE, LABEL)
+    draw_label(draw, font, "FUEL QTY", width // 2 - 45 * SCALE, 12 * SCALE, LABEL)
     draw_label(draw, font, "0", line_x, 58 * SCALE, LABEL)
     draw_label(draw, font, "25", line_x + quarter, 58 * SCALE, LABEL)
     draw_label(draw, font, "50", line_x + quarter * 2, 58 * SCALE, LABEL)
@@ -415,7 +415,7 @@ def make_fuel_flow_base(path):
         fill=shadow,
     )
 
-    draw_label(draw, font, "FF ML/MIN", width // 2, 12 * SCALE, LABEL)
+    draw_label(draw, font, "FF ML/MIN", width // 2 - 45 * SCALE, 12 * SCALE, LABEL)
     draw.rectangle(
         [line_x, line_y - 7 * SCALE, line_x + 2 * SCALE, line_y + 9 * SCALE],
         fill=WHITE,
@@ -445,7 +445,7 @@ def make_rpm_base(path):
     line_w = 169 * SCALE
     line_h = 3 * SCALE
 
-    draw_label(draw, font, "RPM", width // 2, 10 * SCALE, LABEL)
+    draw_label(draw, font, "RPM", 34 * SCALE, 10 * SCALE, LABEL)
 
     draw.rectangle(
         [line_x, line_y, line_x + line_w, line_y + line_h],
