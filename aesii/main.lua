@@ -926,9 +926,9 @@ local function semiGauge(
     )
 
     local tipRadius = radius - math.floor(thickness / 2)
-    local baseRadius = tipRadius - math.floor(radius * 0.23)
+    local baseRadius = tipRadius - math.floor(radius * 0.27)
     local needleHalfWidth = math.floor(
-        clamp(radius * 0.11, 8, 12)
+        clamp(radius * 0.07, 4, 8)
     )
 
     local tipX =
