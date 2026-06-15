@@ -1103,7 +1103,7 @@ local function rpmBox(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
     -- RPM load bar
     --------------------------------------------------------
     local barX = x + 18
-    local barY = y + 28
+    local barY = y + 37
     local barW = 169
     local idlePosition = valuePercent(idleRpm or 800, 0, maxRpm)
     local redlinePosition = valuePercent(redlineRpm or 8000, 0, maxRpm)
@@ -1122,9 +1122,9 @@ local function rpmBox(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
     lcd.color(COL_GREEN)
     lcd.drawFilledRectangle(
         round(idleX - 1),
-        round(barY - 6),
+        round(barY - 4),
         2,
-        12
+        8
     )
 
     local redlineStart = round(redlineX)
@@ -1134,9 +1134,9 @@ local function rpmBox(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
         lcd.color(COL_RED)
         lcd.drawFilledRectangle(
             redlineStart,
-            round(barY - 1),
+            round(barY - 4),
             redlineWidth,
-            3
+            8
         )
     end
 
@@ -1166,9 +1166,9 @@ local function rpmBox(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
         lcd.color(valueColor)
         lcd.drawFilledRectangle(
             round(markerX - 2),
-            round(barY - 8),
+            round(barY - 4),
             4,
-            16
+            8
         )
     end
 end
