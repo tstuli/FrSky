@@ -159,6 +159,70 @@ def draw_arc_band(img, inner, outer, zones):
                 )
 
 
+def draw_arc_shadow(img, inner, outer):
+    sweep = END_DEG - START_DEG
+    samples = 4
+    sample_count = samples * samples
+    bayer = (
+        (0, 48, 12, 60, 3, 51, 15, 63),
+        (32, 16, 44, 28, 35, 19, 47, 31),
+        (8, 56, 4, 52, 11, 59, 7, 55),
+        (40, 24, 36, 20, 43, 27, 39, 23),
+        (2, 50, 14, 62, 1, 49, 13, 61),
+        (34, 18, 46, 30, 33, 17, 45, 29),
+        (10, 58, 6, 54, 9, 57, 5, 53),
+        (42, 26, 38, 22, 41, 25, 37, 21),
+    )
+
+    for y in range(H):
+        for x in range(W):
+            coverage = 0
+            radial_total = 0.0
+
+            for sy in range(samples):
+                for sx in range(samples):
+                    dx = x + (sx + 0.5) / samples - CENTER_X
+                    dy = y + (sy + 0.5) / samples - CENTER_Y
+                    distance = math.sqrt(dx * dx + dy * dy)
+
+                    if distance < inner or distance > outer:
+                        continue
+
+                    angle = math.degrees(math.atan2(dy, dx))
+
+                    if angle < 0:
+                        angle = angle + 360
+
+                    if angle < START_DEG or angle > END_DEG:
+                        continue
+
+                    coverage += 1
+                    radial_total += (distance - inner) / (outer - inner)
+
+            if coverage <= 0:
+                continue
+
+            radial = radial_total / coverage
+            shaped = radial * radial
+            alpha = 0.16 + shaped * 0.68
+            threshold = (bayer[y % 8][x % 8] + 0.5) / 64.0
+
+            if threshold > alpha:
+                continue
+
+            color = lerp_color(
+                (30, 35, 42, 255),
+                (128, 138, 150, 255),
+                shaped,
+            )
+
+            img[y][x] = blend_over(
+                img[y][x],
+                color,
+                coverage / sample_count,
+            )
+
+
 def lerp_color(a, b, t):
     return (
         int(a[0] + (b[0] - a[0]) * t + 0.5),
@@ -195,23 +259,15 @@ def draw_arc_end_line(img, angle_deg, outer_radius, inner_radius):
 
 
 def draw_arc(img, zones):
-    shadow_outer = RADIUS - 1 * SCALE
+    shadow_outer = RADIUS - 6 * SCALE
     color_thickness = max(6 * SCALE, math.floor(THICKNESS * 0.098))
-    shadow_depth = max(12 * SCALE, THICKNESS + 7 * SCALE)
-    shadow_steps = 12
+    shadow_depth = max(28 * SCALE, THICKNESS + 22 * SCALE)
 
-    for step in range(shadow_steps):
-        t = step / (shadow_steps - 1)
-        outer = shadow_outer - (shadow_depth * step / shadow_steps)
-        band_thickness = max(2 * SCALE, math.ceil(shadow_depth / shadow_steps) + SCALE)
-        color = lerp_color((52, 56, 64, 255), (34, 38, 44, 255), t)
-
-        draw_arc_band(
-            img,
-            outer - band_thickness,
-            outer,
-            [(0.0, 1.0, color)]
-        )
+    draw_arc_shadow(
+        img,
+        shadow_outer - shadow_depth,
+        shadow_outer,
+    )
 
     draw_arc_band(
         img,
@@ -259,6 +315,34 @@ def downsample(img, out_w, out_h):
     return out
 
 
+def rgba_rows_to_image(img):
+    height = len(img)
+    width = len(img[0]) if height else 0
+    image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    pixels = image.load()
+
+    for y, row in enumerate(img):
+        for x, px in enumerate(row):
+            pixels[x, y] = px
+
+    return image
+
+
+def crop_transparent_image(image, padding=1):
+    bbox = image.getbbox()
+
+    if bbox is None:
+        return image, 0, 0
+
+    left, top, right, bottom = bbox
+    left = max(0, left - padding)
+    top = max(0, top - padding)
+    right = min(image.width, right + padding)
+    bottom = min(image.height, bottom + padding)
+
+    return image.crop((left, top, right, bottom)), left, top
+
+
 def write_png(path, img):
     height = len(img)
     width = len(img[0]) if height else 0
@@ -288,7 +372,10 @@ def write_png(path, img):
 def make(path, zones):
     img = [[(0, 0, 0, 0) for _ in range(W)] for _ in range(H)]
     draw_arc(img, zones)
-    write_png(path, downsample(img, SIZE, SIZE))
+    downsampled = downsample(img, SIZE, SIZE)
+    image = rgba_rows_to_image(downsampled)
+    cropped, _, _ = crop_transparent_image(image, padding=1)
+    cropped.save(path)
 
 
 def fill_rect(img, x, y, w, h, color):

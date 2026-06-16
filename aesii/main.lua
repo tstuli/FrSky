@@ -36,9 +36,9 @@ local COL_RED      = lcd.RGB(250, 55, 55)
 local FONT_SMALL = SMLSIZE or 0
 local FONT_RPM = DBLSIZE or MIDSIZE or 0
 
-local ARC_BITMAP_SIZE = 216
-local ARC_BITMAP_CENTER_X = 108
-local ARC_BITMAP_CENTER_Y = 127
+local ARC_BITMAP_SIZE = 135
+local ARC_BITMAP_CENTER_X = 89
+local ARC_BITMAP_CENTER_Y = 89
 local RPM_BITMAP_W = 205
 local RPM_BITMAP_H = 70
 local FUEL_BITMAP_W = 210
@@ -934,7 +934,7 @@ local function semiGauge(
     local maxLabelRadius = radius - thickness - 2
 
     drawTinyText(
-        round(centerX + math.cos(maxLabelAngle) * maxLabelRadius + 18),
+        round(centerX + math.cos(maxLabelAngle) * maxLabelRadius + 38),
         round(centerY + math.sin(maxLabelAngle) * maxLabelRadius + 8),
         formatValue(maxValue, decimals, nil),
         COL_LABEL,
@@ -1005,8 +1005,12 @@ local function semiGauge(
     end
 
     local valueText = formatValue(value, decimals, unit)
-    local valueX = centerX + radius * 0.14
-    local labelX = centerX + radius * 0.11
+    local valueX = centerX + radius * 0.12
+    local labelX = valueX
+
+    if string.sub(label or "", 1, 3) == "CHT" then
+        labelX = labelX + 2
+    end
     local valueDrawY = valueY or centerY + 12
 
     drawNativeValue(
