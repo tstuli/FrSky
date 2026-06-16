@@ -527,12 +527,12 @@ def make_rpm_base(path):
     font = get_font(16 * SCALE)
     shadow = (46, 52, 60, 200)
 
-    line_x = 18 * SCALE
+    line_x = 20 * SCALE
     line_y = 37 * SCALE
-    line_w = 169 * SCALE
+    line_w = 170 * SCALE
     line_h = 3 * SCALE
 
-    draw_label(draw, font, "RPM", 34 * SCALE, 10 * SCALE, LABEL)
+    draw_label(draw, font, "RPM", 36 * SCALE, 10 * SCALE, LABEL)
 
     draw.rectangle(
         [line_x, line_y, line_x + line_w, line_y + line_h],

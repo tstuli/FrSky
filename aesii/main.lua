@@ -1078,9 +1078,10 @@ local function rpmBox(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
     --------------------------------------------------------
     -- RPM load bar
     --------------------------------------------------------
-    local barX = x + 18
+    local barX = x + 20
     local barY = y + 37
-    local barW = 169
+    local barW = 170
+    local barRightX = barX + barW - 1
     local idlePosition = valuePercent(idleRpm or 800, 0, maxRpm)
     local redlinePosition = valuePercent(redlineRpm or 8000, 0, maxRpm)
     local idleX = barX + barW * idlePosition
@@ -1104,7 +1105,7 @@ local function rpmBox(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
     )
 
     local redlineStart = round(redlineX)
-    local redlineWidth = round(barX + barW) - redlineStart
+    local redlineWidth = round(barRightX) - redlineStart
 
     if redlineWidth > 0 then
         lcd.color(COL_RED)
@@ -1354,6 +1355,7 @@ local function fuelStrip(
     end
 
     if faceStyle == "remaining" or faceStyle == "flow" then
+        local lineRightX = lineX + lineW - 1
         local lastX = lineX
 
         if zones ~= nil then
@@ -1361,7 +1363,7 @@ local function fuelStrip(
                 local zoneStart = clamp(zone[1], 0, 1)
                 local zoneEnd = clamp(zone[2], 0, 1)
                 local segX1 = lineX + lineW * zoneStart
-                local segX2 = lineX + lineW * zoneEnd
+                local segX2 = math.min(lineRightX, lineX + lineW * zoneEnd)
 
                 if segX2 > segX1 then
                     lcd.color(zone[3])
@@ -1382,18 +1384,18 @@ local function fuelStrip(
             end
         end
 
-        if lastX < lineX + lineW then
+        if lastX < lineRightX then
             lcd.color(COL_GREEN)
             lcd.drawLine(
                 round(lastX),
                 round(lineY),
-                round(lineX + lineW),
+                round(lineRightX),
                 round(lineY)
             )
             lcd.drawLine(
                 round(lastX),
                 round(lineY + 1),
-                round(lineX + lineW),
+                round(lineRightX),
                 round(lineY + 1)
             )
         end
@@ -1824,12 +1826,18 @@ local function paint(widget)
         arcBattBitmap
     )
 
+    local stackX = w / 2 - FUEL_BITMAP_W / 2
+    local rpmY = topY - 32
+    local flowY = rpmY + 80
+    local fuelY = flowY + 80
+    local annunciatorY = fuelY + 78
+
     --------------------------------------------------------
     -- RPM
     --------------------------------------------------------
     rpmBox(
         w / 2 - RPM_BITMAP_W / 2 - 13,
-        topY - 48,
+        rpmY,
         RPM_BITMAP_W,
         RPM_BITMAP_H,
         rpm,
@@ -1842,8 +1850,8 @@ local function paint(widget)
     -- Fuel section
     --------------------------------------------------------
     fuelStrip(
-        w / 2 - FUEL_BITMAP_W / 2,
-        topY + 54,
+        stackX,
+        flowY,
         FUEL_BITMAP_W,
         "FF ML/MIN",
         fuelFlow,
@@ -1860,8 +1868,8 @@ local function paint(widget)
     )
 
     fuelStrip(
-        w / 2 - FUEL_BITMAP_W / 2,
-        topY + 132,
+        stackX,
+        fuelY,
         FUEL_BITMAP_W,
         "FUEL ML",
         fuelRemaining,
@@ -1880,7 +1888,6 @@ local function paint(widget)
 
     local annunciatorW = 102
     local annunciatorGap = 10
-    local annunciatorY = topY + 210
     local annunciatorX =
         w / 2 - annunciatorW - annunciatorGap / 2
 
