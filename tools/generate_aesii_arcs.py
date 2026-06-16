@@ -440,7 +440,7 @@ def needle_triangle(center_x, center_y, radius, angle_deg):
     thickness = max(8, min(12, int(radius * 0.131)))
     tip_radius = radius - math.floor(thickness / 2)
     base_radius = tip_radius - math.floor(radius * 0.27)
-    half_width = max(4, min(8, int(radius * 0.07)))
+    half_width = max(5, min(10, int(radius * 0.082)))
     angle = math.radians(angle_deg)
     tip_x = center_x + math.cos(angle) * tip_radius
     tip_y = center_y + math.sin(angle) * tip_radius
