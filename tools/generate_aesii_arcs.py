@@ -20,6 +20,10 @@ FUEL_FLOW_W = 182
 FUEL_FLOW_H = 70
 RPM_W = 205
 RPM_H = 70
+ARC_CROP_W = 135
+ARC_CROP_H = 91
+ARC_CROP_CENTER_X = 89
+ARC_CROP_CENTER_Y = 89
 SCALE = 4
 W = SIZE * SCALE
 H = SIZE * SCALE
@@ -392,13 +396,16 @@ def make(path, zones, shadow_end_deg=END_DEG):
     make_arc_image(zones, shadow_end_deg).save(path)
 
 
-def make_arc_series(prefix, zones):
+def make_arc_series(prefix, zones, include_needle=False):
     make_arc_image(zones, END_DEG).save(os.path.join(IMAGE_DIR, prefix + ".png"))
 
     for angle in range(START_DEG, END_DEG + 1, ARC_STEP_DEG):
-        make_arc_image(zones, angle).save(
-            os.path.join(IMAGE_DIR, "%s_%03d.png" % (prefix, angle))
-        )
+        image = make_arc_image(zones, angle)
+
+        if include_needle:
+            image = Image.alpha_composite(image, make_arc_needle_image(angle))
+
+        image.save(os.path.join(IMAGE_DIR, "%s_%03d.png" % (prefix, angle)))
 
 
 def fill_rect(img, x, y, w, h, color):
@@ -426,6 +433,54 @@ def draw_label(draw, font, text, x, y, color):
         text,
         font=font,
         fill=color,
+    )
+
+
+def needle_triangle(center_x, center_y, radius, angle_deg):
+    thickness = max(8, min(12, int(radius * 0.131)))
+    tip_radius = radius - math.floor(thickness / 2)
+    base_radius = tip_radius - math.floor(radius * 0.27)
+    half_width = max(4, min(8, int(radius * 0.07)))
+    angle = math.radians(angle_deg)
+    tip_x = center_x + math.cos(angle) * tip_radius
+    tip_y = center_y + math.sin(angle) * tip_radius
+    base_center_x = center_x + math.cos(angle) * base_radius
+    base_center_y = center_y + math.sin(angle) * base_radius
+    normal_x = -math.sin(angle)
+    normal_y = math.cos(angle)
+    base_a = (
+        base_center_x + normal_x * half_width,
+        base_center_y + normal_y * half_width,
+    )
+    base_b = (
+        base_center_x - normal_x * half_width,
+        base_center_y - normal_y * half_width,
+    )
+    return [(tip_x, tip_y), base_a, base_b]
+
+
+def make_arc_needle_image(angle_deg):
+    upscale = 4
+    large = Image.new(
+        "RGBA",
+        (ARC_CROP_W * upscale, ARC_CROP_H * upscale),
+        (0, 0, 0, 0),
+    )
+    draw = ImageDraw.Draw(large)
+    center_x = ARC_CROP_CENTER_X * upscale
+    center_y = ARC_CROP_CENTER_Y * upscale
+    points = needle_triangle(center_x, center_y, 88 * upscale, angle_deg)
+    shadow_points = [
+        (x + 4, y + 4)
+        for x, y in points
+    ]
+
+    draw.polygon(shadow_points, fill=(10, 12, 16, 95))
+    draw.polygon(points, fill=WHITE)
+
+    return large.resize(
+        (ARC_CROP_W, ARC_CROP_H),
+        Image.Resampling.LANCZOS,
     )
 
 
@@ -729,6 +784,7 @@ def main():
                 ((90 - 10) / (150 - 10), (100 - 10) / (150 - 10), YELLOW),
                 ((100 - 10) / (150 - 10), 1.00, RED),
             ],
+            True,
         )
     if not selected or args.all or args.arc_batt:
         make_arc_series(
@@ -738,6 +794,7 @@ def main():
                 ((7.2 - 6.0) / (8.4 - 6.0), (7.6 - 6.0) / (8.4 - 6.0), YELLOW),
                 ((7.6 - 6.0) / (8.4 - 6.0), 1.00, GREEN),
             ],
+            True,
         )
     if not selected or args.all or args.fuel_remaining:
         make_fuel_remaining_base(os.path.join(IMAGE_DIR, "fuel_remaining.png"))
