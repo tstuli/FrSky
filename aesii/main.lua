@@ -1727,7 +1727,7 @@ local function paint(widget)
 
     local topY = mainPanelY + 58
     local chtY = topY + 36
-    local bottomY = h - 50
+    local bottomY = h - 58
 
     local radius = math.floor(
         clamp((bottomY - topY) / 2 + 22, 60, 88)
