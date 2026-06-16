@@ -29,6 +29,7 @@ RADIUS = 88 * SCALE
 THICKNESS = 16 * SCALE
 START_DEG = 180
 END_DEG = 300
+ARC_STEP_DEG = 5
 
 GREEN = (20, 220, 115, 255)
 YELLOW = (255, 210, 0, 255)
@@ -115,9 +116,13 @@ def draw_arc_band(img, inner, outer, zones):
     sweep = END_DEG - START_DEG
     samples = 4
     sample_count = samples * samples
+    min_x = max(0, int(CENTER_X - outer - 2))
+    max_x = min(W - 1, int(CENTER_X + outer + 2))
+    min_y = max(0, int(CENTER_Y - outer - 2))
+    max_y = min(H - 1, int(CENTER_Y + outer + 2))
 
-    for y in range(H):
-        for x in range(W):
+    for y in range(min_y, max_y + 1):
+        for x in range(min_x, max_x + 1):
             coverage = 0
             rs = gs = bs = 0
 
@@ -159,10 +164,14 @@ def draw_arc_band(img, inner, outer, zones):
                 )
 
 
-def draw_arc_shadow(img, inner, outer):
+def draw_arc_shadow(img, inner, outer, shadow_end_deg):
     sweep = END_DEG - START_DEG
     samples = 4
     sample_count = samples * samples
+    min_x = max(0, int(CENTER_X - outer - 2))
+    max_x = min(W - 1, int(CENTER_X + outer + 2))
+    min_y = max(0, int(CENTER_Y - outer - 2))
+    max_y = min(H - 1, int(CENTER_Y + outer + 2))
     bayer = (
         (0, 48, 12, 60, 3, 51, 15, 63),
         (32, 16, 44, 28, 35, 19, 47, 31),
@@ -174,8 +183,8 @@ def draw_arc_shadow(img, inner, outer):
         (42, 26, 38, 22, 41, 25, 37, 21),
     )
 
-    for y in range(H):
-        for x in range(W):
+    for y in range(min_y, max_y + 1):
+        for x in range(min_x, max_x + 1):
             coverage = 0
             radial_total = 0.0
 
@@ -193,7 +202,7 @@ def draw_arc_shadow(img, inner, outer):
                     if angle < 0:
                         angle = angle + 360
 
-                    if angle < START_DEG or angle > END_DEG:
+                    if angle < START_DEG or angle > shadow_end_deg:
                         continue
 
                     coverage += 1
@@ -258,7 +267,7 @@ def draw_arc_end_line(img, angle_deg, outer_radius, inner_radius):
                 img[py][px] = blend_over(img[py][px], WHITE, 1.0)
 
 
-def draw_arc(img, zones):
+def draw_arc(img, zones, shadow_end_deg=END_DEG):
     shadow_outer = RADIUS - 6 * SCALE
     color_thickness = max(6 * SCALE, math.floor(THICKNESS * 0.098))
     shadow_depth = max(28 * SCALE, THICKNESS + 22 * SCALE)
@@ -267,6 +276,7 @@ def draw_arc(img, zones):
         img,
         shadow_outer - shadow_depth,
         shadow_outer,
+        shadow_end_deg,
     )
 
     draw_arc_band(
@@ -343,6 +353,15 @@ def crop_transparent_image(image, padding=1):
     return image.crop((left, top, right, bottom)), left, top
 
 
+def make_arc_image(zones, shadow_end_deg=END_DEG):
+    img = [[(0, 0, 0, 0) for _ in range(W)] for _ in range(H)]
+    draw_arc(img, zones, shadow_end_deg)
+    downsampled = downsample(img, SIZE, SIZE)
+    image = rgba_rows_to_image(downsampled)
+    cropped, _, _ = crop_transparent_image(image, padding=1)
+    return cropped
+
+
 def write_png(path, img):
     height = len(img)
     width = len(img[0]) if height else 0
@@ -369,13 +388,17 @@ def write_png(path, img):
         handle.write(png)
 
 
-def make(path, zones):
-    img = [[(0, 0, 0, 0) for _ in range(W)] for _ in range(H)]
-    draw_arc(img, zones)
-    downsampled = downsample(img, SIZE, SIZE)
-    image = rgba_rows_to_image(downsampled)
-    cropped, _, _ = crop_transparent_image(image, padding=1)
-    cropped.save(path)
+def make(path, zones, shadow_end_deg=END_DEG):
+    make_arc_image(zones, shadow_end_deg).save(path)
+
+
+def make_arc_series(prefix, zones):
+    make_arc_image(zones, END_DEG).save(os.path.join(IMAGE_DIR, prefix + ".png"))
+
+    for angle in range(START_DEG, END_DEG + 1, ARC_STEP_DEG):
+        make_arc_image(zones, angle).save(
+            os.path.join(IMAGE_DIR, "%s_%03d.png" % (prefix, angle))
+        )
 
 
 def fill_rect(img, x, y, w, h, color):
@@ -699,8 +722,8 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     os.makedirs(IMAGE_DIR, exist_ok=True)
     if not selected or args.all or args.arc_temp:
-        make(
-            os.path.join(IMAGE_DIR, "arc_temp.png"),
+        make_arc_series(
+            "arc_temp",
             [
                 (0.00, (90 - 10) / (150 - 10), GREEN),
                 ((90 - 10) / (150 - 10), (100 - 10) / (150 - 10), YELLOW),
@@ -708,8 +731,8 @@ def main():
             ],
         )
     if not selected or args.all or args.arc_batt:
-        make(
-            os.path.join(IMAGE_DIR, "arc_batt.png"),
+        make_arc_series(
+            "arc_batt",
             [
                 (0.00, (7.2 - 6.0) / (8.4 - 6.0), RED),
                 ((7.2 - 6.0) / (8.4 - 6.0), (7.6 - 6.0) / (8.4 - 6.0), YELLOW),

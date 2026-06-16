@@ -47,6 +47,8 @@ local FUEL_REMAINING_LINE_X = 9
 local FUEL_REMAINING_LINE_W = 170
 local arcTempBitmap = nil
 local arcBattBitmap = nil
+local arcTempBitmaps = {}
+local arcBattBitmaps = {}
 local fuelRemainingBitmap = nil
 local fuelFlowBitmap = nil
 local rpmBaseBitmap = nil
@@ -65,6 +67,7 @@ local QUANTIZE_BATTERY = 0.05
 local QUANTIZE_RPM = 25
 local QUANTIZE_FUEL_FLOW = 1
 local QUANTIZE_FUEL_REMAINING = 5
+local ARC_NEEDLE_STEP_DEG = 5
 
 ------------------------------------------------------------
 -- HELPERS
@@ -118,6 +121,18 @@ end
 
 local function thresholdPercent(threshold, minValue, maxValue)
     return valuePercent(threshold, minValue, maxValue)
+end
+
+local function quantizeAngleDegrees(angleDeg, stepDeg)
+    if angleDeg == nil then
+        return nil
+    end
+
+    if stepDeg == nil or stepDeg <= 0 then
+        return angleDeg
+    end
+
+    return round(angleDeg / stepDeg) * stepDeg
 end
 
 local function tryLoadBitmap(path)
@@ -226,6 +241,39 @@ local function loadArcBitmaps()
             break
         end
     end
+end
+
+local function loadSteppedArcBitmap(cache, prefix, angleDeg)
+    if angleDeg == nil then
+        return nil
+    end
+
+    if cache[angleDeg] ~= nil then
+        if cache[angleDeg] == false then
+            return nil
+        end
+
+        return cache[angleDeg]
+    end
+
+    local filename = string.format("%s_%03d.png", prefix, angleDeg)
+    local paths = {
+        "images/" .. filename,
+        "scripts/aesii/images/" .. filename,
+        "/scripts/aesii/images/" .. filename
+    }
+
+    for _, path in ipairs(paths) do
+        local loaded = tryLoadBitmap(path)
+
+        if loaded ~= nil then
+            cache[angleDeg] = loaded
+            return loaded
+        end
+    end
+
+    cache[angleDeg] = false
+    return nil
 end
 
 local function drawBitmapAt(bitmapValue, x, y)
@@ -906,7 +954,9 @@ local function semiGauge(
     zones,
     labelY,
     valueY,
-    arcBitmap
+    arcBitmap,
+    steppedBitmaps,
+    steppedPrefix
 )
     local position = valuePercent(value, minValue, maxValue)
 
@@ -917,8 +967,6 @@ local function semiGauge(
     local thickness = math.floor(
         clamp(radius * 0.131, 8, 12)
     )
-
-    drawArcBitmap(arcBitmap, centerX, centerY)
 
     local minLabelAngle = math.rad(startAngle)
     local minLabelRadius = radius - thickness - 1
@@ -944,9 +992,27 @@ local function semiGauge(
     --------------------------------------------------------
     -- Pointer
     --------------------------------------------------------
-    local pointerAngle = math.rad(
-        startAngle + sweep * position
+    local pointerAngleDeg = startAngle + sweep * position
+    local displayAngleDeg = quantizeAngleDegrees(
+        pointerAngleDeg,
+        ARC_NEEDLE_STEP_DEG
     )
+
+    displayAngleDeg = clamp(displayAngleDeg, startAngle, endAngle)
+
+    local activeArcBitmap = arcBitmap
+
+    if value ~= nil and steppedBitmaps ~= nil and steppedPrefix ~= nil then
+        activeArcBitmap = loadSteppedArcBitmap(
+            steppedBitmaps,
+            steppedPrefix,
+            displayAngleDeg
+        ) or activeArcBitmap
+    end
+
+    drawArcBitmap(activeArcBitmap, centerX, centerY)
+
+    local pointerAngle = math.rad(displayAngleDeg)
 
     local tipRadius = radius - math.floor(thickness / 2)
     local baseRadius = tipRadius - math.floor(radius * 0.27)
@@ -1760,7 +1826,9 @@ local function paint(widget)
         },
         chtLabelY,
         chtValueY,
-        arcTempBitmap
+        arcTempBitmap,
+        arcTempBitmaps,
+        "arc_temp"
     )
 
     semiGauge(
@@ -1780,7 +1848,9 @@ local function paint(widget)
         },
         chtLabelY,
         chtValueY,
-        arcTempBitmap
+        arcTempBitmap,
+        arcTempBitmaps,
+        "arc_temp"
     )
 
     --------------------------------------------------------
@@ -1803,7 +1873,9 @@ local function paint(widget)
         },
         bottomLabelY,
         bottomValueY,
-        arcBattBitmap
+        arcBattBitmap,
+        arcBattBitmaps,
+        "arc_batt"
     )
 
     semiGauge(
@@ -1823,7 +1895,9 @@ local function paint(widget)
         },
         bottomLabelY,
         bottomValueY,
-        arcBattBitmap
+        arcBattBitmap,
+        arcBattBitmaps,
+        "arc_batt"
     )
 
     local stackX = w / 2 - FUEL_BITMAP_W / 2
@@ -1976,7 +2050,9 @@ local function paintTemperatureGauge(widget, gaugeIndex)
         },
         labelY,
         valueY,
-        arcTempBitmap
+        arcTempBitmap,
+        arcTempBitmaps,
+        "arc_temp"
     )
 end
 
@@ -2016,7 +2092,9 @@ local function paintBatteryGauge(widget, gaugeIndex)
         },
         labelY,
         valueY,
-        arcBattBitmap
+        arcBattBitmap,
+        arcBattBitmaps,
+        "arc_batt"
     )
 end
 
