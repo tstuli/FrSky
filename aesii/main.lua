@@ -68,6 +68,10 @@ local QUANTIZE_RPM = 25
 local QUANTIZE_FUEL_FLOW = 1
 local QUANTIZE_FUEL_REMAINING = 5
 local ARC_NEEDLE_STEP_DEG = 5
+local REFRESH_CHT_MS = 400
+local REFRESH_BATTERY_MS = 400
+local REFRESH_FUEL_REMAINING_MS = 500
+local REFRESH_FAST_MS = 100
 
 ------------------------------------------------------------
 -- HELPERS
@@ -133,6 +137,19 @@ local function quantizeAngleDegrees(angleDeg, stepDeg)
     end
 
     return round(angleDeg / stepDeg) * stepDeg
+end
+
+local function arcDisplayAngle(value, minValue, maxValue)
+    if value == nil then
+        return nil
+    end
+
+    local position = valuePercent(value, minValue, maxValue)
+
+    return quantizeAngleDegrees(
+        180 + (300 - 180) * position,
+        ARC_NEEDLE_STEP_DEG
+    )
 end
 
 local function tryLoadBitmap(path)
@@ -542,24 +559,84 @@ local function quantizeValue(value, step)
     return round(value / step) * step
 end
 
-local function readTelemetrySnapshot(widget)
-    return {
-        cht1 = quantizeValue(getVal(widget.temp1), QUANTIZE_CHT),
-        cht2 = quantizeValue(getVal(widget.temp2), QUANTIZE_CHT),
-        bat1 = quantizeValue(getVal(widget.volt1), QUANTIZE_BATTERY),
-        bat2 = quantizeValue(getVal(widget.volt2), QUANTIZE_BATTERY),
-        rpm = quantizeValue(getVal(widget.rpm), QUANTIZE_RPM),
-        fuelFlow = quantizeValue(
+local function readTelemetrySnapshot(widget, nowMs)
+    local previous = widget._telemetrySnapshot or {}
+    local updateTimes = widget._telemetryUpdateMs or {}
+
+    local function sampledValue(field, rawValue, step, minIntervalMs)
+        local value = quantizeValue(rawValue, step)
+        local lastUpdate = updateTimes[field]
+
+        if previous[field] == nil or
+            nowMs == nil or
+            lastUpdate == nil or
+            nowMs - lastUpdate >= (minIntervalMs or REFRESH_FAST_MS) then
+            updateTimes[field] = nowMs
+            return value
+        end
+
+        return previous[field]
+    end
+
+    local snapshot = {
+        cht1 = sampledValue(
+            "cht1",
+            getVal(widget.temp1),
+            QUANTIZE_CHT,
+            REFRESH_CHT_MS
+        ),
+        cht2 = sampledValue(
+            "cht2",
+            getVal(widget.temp2),
+            QUANTIZE_CHT,
+            REFRESH_CHT_MS
+        ),
+        bat1 = sampledValue(
+            "bat1",
+            getVal(widget.volt1),
+            QUANTIZE_BATTERY,
+            REFRESH_BATTERY_MS
+        ),
+        bat2 = sampledValue(
+            "bat2",
+            getVal(widget.volt2),
+            QUANTIZE_BATTERY,
+            REFRESH_BATTERY_MS
+        ),
+        rpm = sampledValue(
+            "rpm",
+            getVal(widget.rpm),
+            QUANTIZE_RPM,
+            REFRESH_FAST_MS
+        ),
+        fuelFlow = sampledValue(
+            "fuelFlow",
             getVal(widget.fuel_flow),
-            QUANTIZE_FUEL_FLOW
+            QUANTIZE_FUEL_FLOW,
+            REFRESH_FAST_MS
         ),
-        fuelRemaining = quantizeValue(
+        fuelRemaining = sampledValue(
+            "fuelRemaining",
             getVal(widget.fuel_remaining),
-            QUANTIZE_FUEL_REMAINING
+            QUANTIZE_FUEL_REMAINING,
+            REFRESH_FUEL_REMAINING_MS
         ),
-        ignitionEnabled = getVal(widget.ignition),
-        modeState = getVal(widget.mode_state)
+        ignitionEnabled = sampledValue(
+            "ignitionEnabled",
+            getVal(widget.ignition),
+            nil,
+            REFRESH_FAST_MS
+        ),
+        modeState = sampledValue(
+            "modeState",
+            getVal(widget.mode_state),
+            nil,
+            REFRESH_FAST_MS
+        )
     }
+
+    widget._telemetryUpdateMs = updateTimes
+    return snapshot
 end
 
 local function zoneColor(position, zones)
@@ -629,6 +706,10 @@ local function formattedTelemetryKey(widget, telemetry)
     local fuelRemaining = snapshot.fuelRemaining
     local ignitionEnabled = snapshot.ignitionEnabled
     local modeState = snapshot.modeState
+    local cht1Angle = arcDisplayAngle(cht1, cht1Min, cht1Max)
+    local cht2Angle = arcDisplayAngle(cht2, cht2Min, cht2Max)
+    local bat1Angle = arcDisplayAngle(bat1, bat1Min, bat1Max)
+    local bat2Angle = arcDisplayAngle(bat2, bat2Min, bat2Max)
 
     return table.concat({
         widget.kind or "dashboard",
@@ -640,9 +721,13 @@ local function formattedTelemetryKey(widget, telemetry)
         formatValue(cht2, 0, "C"),
         formatValue(bat1, 2, "V"),
         formatValue(bat2, 2, "V"),
+        cht1Angle == nil and "angnil" or string.format("a%d", cht1Angle),
+        cht2Angle == nil and "angnil" or string.format("a%d", cht2Angle),
+        bat1Angle == nil and "angnil" or string.format("a%d", bat1Angle),
+        bat2Angle == nil and "angnil" or string.format("a%d", bat2Angle),
         rpm == nil and "---" or string.format("%d", round(rpm)),
         formatValue(fuelFlow, 1, nil),
-        formatValue(fuelRemaining, 0, nil),
+        fuelRemaining == nil and "---" or formatValue(fuelRemaining / 10, 0, "%"),
         formatValue(cht1Min, 0, nil),
         formatValue(cht1Max, 0, nil),
         formatValue(cht2Min, 0, nil),
@@ -1530,7 +1615,7 @@ local function paint(widget)
     local telemetry = widget._telemetrySnapshot
 
     if telemetry == nil then
-        telemetry = readTelemetrySnapshot(widget)
+        telemetry = readTelemetrySnapshot(widget, os.clock() * 1000)
         widget._telemetrySnapshot = telemetry
     end
 
@@ -2021,7 +2106,7 @@ local function wakeup(widget)
 
     lastTime = now
 
-    local telemetry = readTelemetrySnapshot(widget)
+    local telemetry = readTelemetrySnapshot(widget, now)
     local renderKey = formattedTelemetryKey(widget, telemetry)
 
     if widget._lastRenderKey ~= renderKey then
