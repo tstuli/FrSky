@@ -53,7 +53,6 @@ local fuelRemainingBitmap = nil
 local fuelFlowBitmap = nil
 local rpmBaseBitmap = nil
 local labelBitmaps = {}
-local spriteFontBitmaps = {}
 local arcBitmapLoadAttempted = false
 local bitmapDrawMethod = nil
 
@@ -421,118 +420,6 @@ local function drawArcBitmap(bitmapValue, centerX, centerY)
     )
 end
 
-local FONT_SPRITES = {
-    small = {w = 11, h = 20},
-    value = {w = 17, h = 28},
-    rpm = {w = 20, h = 35}
-}
-
-local function colorStyle(color)
-    if color == COL_GREEN then return "green" end
-    if color == COL_YELLOW then return "yellow" end
-    if color == COL_RED then return "red" end
-    if color == COL_WHITE then return "white" end
-
-    return "label"
-end
-
-local function glyphName(sizeName, styleName, char)
-    return string.format(
-        "font_%s_%s_%04x.png",
-        sizeName,
-        styleName,
-        string.byte(char)
-    )
-end
-
-local function loadGlyph(sizeName, styleName, char)
-    if char == " " then
-        return true
-    end
-
-    local name = glyphName(sizeName, styleName, char)
-    local cacheKey = sizeName .. "|" .. styleName .. "|" .. char
-
-    if spriteFontBitmaps[cacheKey] ~= nil then
-        if spriteFontBitmaps[cacheKey] == false then
-            return nil
-        end
-
-        return spriteFontBitmaps[cacheKey]
-    end
-
-    local paths = {
-        "images/" .. name,
-        "scripts/aesii/images/" .. name,
-        "/scripts/aesii/images/" .. name,
-        name,
-        "scripts/aesii/" .. name,
-        "/scripts/aesii/" .. name
-    }
-
-    for _, path in ipairs(paths) do
-        local loaded = tryLoadBitmap(path)
-
-        if loaded ~= nil then
-            spriteFontBitmaps[cacheKey] = loaded
-            return loaded
-        end
-    end
-
-    spriteFontBitmaps[cacheKey] = false
-    return nil
-end
-
-local function spriteTextWidth(sizeName, text)
-    local spec = FONT_SPRITES[sizeName]
-
-    if spec == nil then
-        return 0
-    end
-
-    return #text * spec.w
-end
-
-local function drawSpriteText(sizeName, x, y, text, color, align)
-    local spec = FONT_SPRITES[sizeName]
-
-    if spec == nil or text == nil then
-        return false
-    end
-
-    local styleName = colorStyle(color or COL_LABEL)
-
-    for i = 1, #text do
-        local char = string.sub(text, i, i)
-
-        if loadGlyph(sizeName, styleName, char) == nil then
-            return false
-        end
-    end
-
-    local drawX = round(x)
-    local width = spriteTextWidth(sizeName, text)
-
-    if align == "right" or (RIGHT ~= nil and align == RIGHT) then
-        drawX = drawX - width
-    elseif align == "center" or (CENTER ~= nil and align == CENTER) then
-        drawX = drawX - math.floor(width / 2)
-    end
-
-    for i = 1, #text do
-        local char = string.sub(text, i, i)
-        local glyph = loadGlyph(sizeName, styleName, char)
-
-        if glyph ~= true then
-            drawBitmapAt(glyph, drawX, round(y))
-        end
-
-        drawX = drawX + spec.w
-    end
-
-    return true
-end
-
 local function getVal(source)
     if source == nil then return nil end
 
@@ -746,19 +633,6 @@ local function formattedTelemetryKey(widget, telemetry)
     }, "|")
 end
 
-local function centeredText(x, y, text, color)
-    if drawSpriteText("small", x, y, text, color or COL_TEXT, "center") then
-        return
-    end
-
-    lcd.color(color or COL_TEXT)
-    if CENTER ~= nil then
-        lcd.drawText(round(x), round(y), text, CENTER)
-    else
-        lcd.drawText(round(x - (#text * 3)), round(y), text)
-    end
-end
-
 local function annunciatorLabelBitmapName(label, activeColor, active)
     if label == "IGN" then
         if active and activeColor == COL_GREEN then
@@ -777,74 +651,15 @@ local function annunciatorLabelBitmapName(label, activeColor, active)
     return nil
 end
 
-local TINY_DIGITS = {
-    ["0"] = {"111", "101", "101", "101", "111"},
-    ["1"] = {"010", "110", "010", "010", "111"},
-    ["2"] = {"111", "001", "111", "100", "111"},
-    ["3"] = {"111", "001", "111", "001", "111"},
-    ["4"] = {"101", "101", "111", "001", "001"},
-    ["5"] = {"111", "100", "111", "001", "111"},
-    ["6"] = {"111", "100", "111", "101", "111"},
-    ["7"] = {"111", "001", "010", "010", "010"},
-    ["8"] = {"111", "101", "111", "101", "111"},
-    ["9"] = {"111", "101", "111", "001", "111"},
-    ["."] = {"000", "000", "000", "000", "010"},
-    ["-"] = {"000", "000", "111", "000", "000"}
-}
-
-local function tinyTextWidth(text, scale)
-    local width = 0
-
-    for i = 1, #text do
-        local char = string.sub(text, i, i)
-
-        if TINY_DIGITS[char] ~= nil then
-            width = width + 4 * scale
-        end
-    end
-
-    if width > 0 then
-        width = width - scale
-    end
-
-    return width
-end
-
 local function drawTinyText(x, y, text, color, flags)
-    local align = nil
-
-    if RIGHT ~= nil and flags == RIGHT then
-        align = "right"
-    elseif CENTER ~= nil and flags == CENTER then
-        align = "center"
-    end
-
-    if drawSpriteText("small", x, y, text, color or COL_LABEL, align) then
-        return
-    end
-
-    local drawX = round(x)
-    local charWidth = 6
-
-    if FONT_SMALL == 0 then
-        charWidth = 7
-    end
-
-    local width = #text * charWidth
-
-    if RIGHT ~= nil and flags == RIGHT then
-        drawX = drawX - width
-    elseif CENTER ~= nil and flags == CENTER then
-        drawX = drawX - math.floor(width / 2)
-    end
-
-    lcd.color(color or COL_LABEL)
-
-    if FONT_SMALL ~= 0 then
-        lcd.drawText(drawX, round(y), text, FONT_SMALL)
-    else
-        lcd.drawText(drawX, round(y), text)
-    end
+    drawNativeText(
+        x,
+        y,
+        text,
+        color or COL_LABEL,
+        FONT_SMALL,
+        flags
+    )
 end
 
 local function drawNativeText(x, y, text, color, font, align)
@@ -1003,30 +818,14 @@ local function semiGauge(
         "center"
     )
 
-    if not drawSpriteText(
-        "small",
+    drawNativeText(
         labelX,
         labelY or centerY + 31,
         label,
         COL_LABEL,
+        0,
         "center"
-    ) then
-        lcd.color(COL_LABEL)
-        if CENTER ~= nil then
-            lcd.drawText(
-                round(labelX),
-                round(labelY or centerY + 31),
-                label,
-                CENTER
-            )
-        else
-            lcd.drawText(
-                round(labelX - (#label * 3)),
-                round(labelY or centerY + 31),
-                label
-            )
-        end
-    end
+    )
 end
 
 ------------------------------------------------------------
@@ -1113,13 +912,8 @@ local function rpmBox(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
     local minX = barX + 5
     local maxX = barX + barW + 6
 
-    if not drawSpriteText("small", minX, scaleLabelY, minText, COL_LABEL, "right") then
-        drawNativeText(minX, scaleLabelY, minText, COL_LABEL, FONT_SMALL, "right")
-    end
-
-    if not drawSpriteText("small", maxX, scaleLabelY, maxText, COL_LABEL, "right") then
-        drawNativeText(maxX, scaleLabelY, maxText, COL_LABEL, FONT_SMALL, "right")
-    end
+    drawNativeText(minX, scaleLabelY, minText, COL_LABEL, FONT_SMALL, "right")
+    drawNativeText(maxX, scaleLabelY, maxText, COL_LABEL, FONT_SMALL, "right")
 
     if rpm ~= nil then
         lcd.color(valueColor)
@@ -1271,37 +1065,14 @@ local function fuelStrip(
         valueColor = zoneColor(position, zones)
     end
 
-    local baseDrawn = drawBitmapAt(
+    drawBitmapAt(
         baseBitmap,
         round(x),
         round(y)
     )
 
-    if not baseDrawn then
-        lcd.color(COL_WHITE)
-        lcd.drawLine(
-            round(x + 10),
-            round(y + 43),
-            round(x + 140),
-            round(y + 43)
-        )
-    end
-
     if faceStyle ~= "remaining" and faceStyle ~= "flow" then
-        if not drawSpriteText(
-                "small",
-                x - 41,
-                y + 4,
-                label,
-                COL_LABEL
-            ) then
-            lcd.color(COL_LABEL)
-            lcd.drawText(
-                round(x - 41),
-                round(y + 4),
-                label
-            )
-        end
+        drawNativeText(x - 41, y + 4, label, COL_LABEL, 0)
     end
 
     local stripValueText = formatValue(value, decimals, unit)
@@ -1398,43 +1169,8 @@ local function fuelStrip(
         local minX = lineX + 5
         local maxX = lineX + lineW + 6
 
-        lcd.color(COL_LABEL)
-
-        if drawSpriteText("small", minX, labelY - 8, minText, COL_LABEL, "right") then
-            -- Sprite text handled the label.
-        elseif RIGHT ~= nil then
-            lcd.drawText(
-                round(minX),
-                round(labelY - 8),
-                minText,
-                RIGHT
-            )
-        else
-            lcd.drawText(
-                round(minX - (#minText * 6)),
-                round(labelY - 8),
-                minText
-            )
-        end
-
-        lcd.color(COL_LABEL)
-
-        if drawSpriteText("small", maxX, labelY - 10, maxText, COL_LABEL, "right") then
-            -- Sprite text handled the label.
-        elseif RIGHT ~= nil then
-            lcd.drawText(
-                round(maxX),
-                round(labelY - 10),
-                maxText,
-                RIGHT
-            )
-        else
-            lcd.drawText(
-                round(maxX - (#maxText * 6)),
-                round(labelY - 10),
-                maxText
-            )
-        end
+        drawNativeText(minX, labelY - 8, minText, COL_LABEL, 0, "right")
+        drawNativeText(maxX, labelY - 10, maxText, COL_LABEL, 0, "right")
     end
 
     local markerPosition = clamp(position, 0, 1)
@@ -1452,31 +1188,14 @@ local function fuelStrip(
         return
     end
 
-    if not drawSpriteText(
-        "small",
+    drawNativeText(
         x + w - 8,
         y + 35,
         formatValue(maxValue, decimals, unit),
         COL_WHITE,
+        0,
         "right"
-    ) then
-        local maxText = formatValue(maxValue, decimals, unit)
-
-        if RIGHT ~= nil then
-            lcd.drawText(
-                round(x + w - 8),
-                round(y + 35),
-                maxText,
-                RIGHT
-            )
-        else
-            lcd.drawText(
-                round(x + w - 8 - (#maxText * 6)),
-                round(y + 35),
-                maxText
-            )
-        end
-    end
+    )
 
 end
 
@@ -1526,36 +1245,14 @@ local function annunciatorLamp(x, y, w, label, activeColor, active, stateText)
     local labelBitmapName =
         annunciatorLabelBitmapName(label, activeColor, active)
 
-    if not (
-        labelBitmapName ~= nil and
+    if labelBitmapName ~= nil then
         drawLabelBitmap(labelBitmapName, x + 38, y + 3)
-    ) and not drawSpriteText(
-            "small",
-            x + 38,
-            y + 3,
-            label,
-            labelColor
-        ) then
-        lcd.color(labelColor)
-        lcd.drawText(round(x + 38), round(y + 5), label)
+    else
+        drawNativeText(x + 38, y + 5, label, labelColor, 0)
     end
 
     if stateText ~= nil then
-        if not drawSpriteText(
-            "small",
-            x + w - 10,
-            y + 3,
-            stateText,
-            labelColor,
-            "right"
-        ) then
-            lcd.color(labelColor)
-            if RIGHT ~= nil then
-                lcd.drawText(round(x + w - 10), round(y + 5), stateText, RIGHT)
-            else
-                lcd.drawText(round(x + w - 10 - (#stateText * 6)), round(y + 5), stateText)
-            end
-        end
+        drawNativeText(x + w - 10, y + 5, stateText, labelColor, 0, "right")
     end
 end
 

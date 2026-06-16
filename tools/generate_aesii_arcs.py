@@ -47,7 +47,6 @@ DIM = (42, 49, 58, 255)
 LABEL = (155, 172, 186, 255)
 WHITE = (255, 255, 255, 255)
 
-FONT_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ./- "
 FONT_VARIANTS = {
     "label": LABEL,
     "white": WHITE,
@@ -59,12 +58,6 @@ FONT_SPECS = {
     "small": {"size": 17, "w": 11, "h": 20, "y": -1},
     "value": {"size": 24, "w": 17, "h": 28, "y": -2},
     "rpm": {"size": 31, "w": 20, "h": 35, "y": -3},
-}
-FONT_GENERATION = {
-    "small": {
-        "chars": FONT_CHARS,
-        "variants": ("label", "green", "yellow"),
-    },
 }
 LABEL_ASSETS = (
     ("ign_label", "IGN", "small", "label"),
@@ -644,59 +637,6 @@ def get_font(size):
     return ImageFont.load_default()
 
 
-def make_font_glyphs():
-    for font_name, spec in FONT_SPECS.items():
-        generation = FONT_GENERATION.get(font_name)
-
-        if generation is None:
-            continue
-
-        scale = FONT_RENDER_SCALE
-        font = get_font(spec["size"] * scale)
-
-        for variant_name in generation["variants"]:
-            color = FONT_VARIANTS[variant_name]
-
-            for char in generation["chars"]:
-                if char == " ":
-                    continue
-
-                image = Image.new(
-                    "RGBA",
-                    (spec["w"] * scale, spec["h"] * scale),
-                    (0, 0, 0, 0),
-                )
-                draw = ImageDraw.Draw(image)
-                bbox = draw.textbbox((0, 0), char, font=font)
-                text_w = bbox[2] - bbox[0]
-                text_h = bbox[3] - bbox[1]
-                text_x = (spec["w"] * scale - text_w) // 2 - bbox[0]
-                text_y = (
-                    (spec["h"] * scale - text_h) // 2 -
-                    bbox[1] +
-                    spec["y"] * scale
-                )
-
-                draw.text(
-                    (text_x, text_y),
-                    char,
-                    font=font,
-                    fill=color,
-                )
-
-                image = image.resize(
-                    (spec["w"], spec["h"]),
-                    Image.Resampling.LANCZOS,
-                )
-
-                filename = "font_%s_%s_%04x.png" % (
-                    font_name,
-                    variant_name,
-                    ord(char),
-                )
-                image.save(os.path.join(IMAGE_DIR, filename))
-
-
 def render_text_asset(path, text, font_name, variant_name):
     spec = FONT_SPECS[font_name]
     scale = FONT_RENDER_SCALE
@@ -755,7 +695,6 @@ def parse_args():
     parser.add_argument("--fuel-flow", action="store_true", help="Regenerate fuel_flow.png.")
     parser.add_argument("--rpm-base", action="store_true", help="Regenerate rpm_base.png.")
     parser.add_argument("--labels", action="store_true", help="Regenerate label PNGs.")
-    parser.add_argument("--fonts", action="store_true", help="Regenerate font glyph PNGs.")
     return parser.parse_args()
 
 
@@ -770,7 +709,6 @@ def main():
             args.fuel_flow,
             args.rpm_base,
             args.labels,
-            args.fonts,
         ]
     )
 
@@ -805,8 +743,6 @@ def main():
 
     if not selected or args.all or args.labels:
         make_label_assets()
-    if not selected or args.all or args.fonts:
-        make_font_glyphs()
 
 
 if __name__ == "__main__":
