@@ -651,6 +651,8 @@ local function annunciatorLabelBitmapName(label, activeColor, active)
     return nil
 end
 
+local drawNativeText
+
 local function drawTinyText(x, y, text, color, flags)
     drawNativeText(
         x,
@@ -662,7 +664,7 @@ local function drawTinyText(x, y, text, color, flags)
     )
 end
 
-local function drawNativeText(x, y, text, color, font, align)
+drawNativeText = function(x, y, text, color, font, align)
     local drawX = round(x)
 
     lcd.color(color or COL_TEXT)
@@ -1269,20 +1271,20 @@ local function ignitionAnnunciator(x, y, w, enabled)
 end
 
 local function modeAnnunciator(x, y, w, modeValue)
-    local mode = 0
+    local mode = nil
 
     if modeValue ~= nil then
         mode = round(modeValue)
     end
 
-    local active = mode >= 0
+    local active = mode ~= nil and mode >= 0
     local stateText = "OFF"
     local activeColor = COL_LABEL
 
-    if mode >= 100 then
+    if mode ~= nil and mode >= 100 then
         stateText = "STAB"
         activeColor = COL_GREEN
-    elseif mode >= 0 then
+    elseif mode ~= nil and mode >= 0 then
         stateText = "GYRO"
         activeColor = COL_YELLOW
     end
