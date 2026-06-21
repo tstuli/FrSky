@@ -1276,7 +1276,7 @@ local function drawFuelGauge(
         local valueTextX = x + w - 20 * faceScale
 
         if faceScale < 1 then
-            valueTextX = x + w + 18
+            valueTextX = x + w + 8
         end
 
         drawSmallValue(
