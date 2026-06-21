@@ -38,6 +38,8 @@ GAUGE_BITMAP_W = 135
 GAUGE_BITMAP_H = 91
 GAUGE_BITMAP_CENTER_X = 89
 GAUGE_BITMAP_CENTER_Y = 89
+COMPACT_GAUGE_SCALE = 0.75
+COMPACT_FACE_SCALE = 0.84
 SCALE = 4
 CANVAS_W = GAUGE_CANVAS_SIZE * SCALE
 CANVAS_H = GAUGE_CANVAS_SIZE * SCALE
@@ -365,8 +367,11 @@ def make_gauge_face_image(zones, shadow_end_deg=GAUGE_END_DEG):
 
 
 def make_gauge_series(prefix, zones, include_needle=False):
-    make_gauge_face_image(zones, GAUGE_END_DEG).save(
-        os.path.join(IMAGE_DIR, prefix + ".png")
+    base_image = make_gauge_face_image(zones, GAUGE_END_DEG)
+    base_image.save(os.path.join(IMAGE_DIR, prefix + ".png"))
+    save_compact_gauge_image(
+        base_image,
+        os.path.join(IMAGE_DIR, prefix + "_compact.png"),
     )
 
     for angle in range(GAUGE_START_DEG, GAUGE_END_DEG + 1, GAUGE_STEP_DEG):
@@ -376,6 +381,27 @@ def make_gauge_series(prefix, zones, include_needle=False):
             image = Image.alpha_composite(image, make_gauge_needle_image(angle))
 
         image.save(os.path.join(IMAGE_DIR, "%s_%03d.png" % (prefix, angle)))
+        save_compact_gauge_image(
+            image,
+            os.path.join(IMAGE_DIR, "%s_compact_%03d.png" % (prefix, angle)),
+        )
+
+
+def save_compact_gauge_image(image, path):
+    width = max(1, round(image.width * COMPACT_GAUGE_SCALE))
+    height = max(1, round(image.height * COMPACT_GAUGE_SCALE))
+
+    image.resize((width, height), Image.Resampling.LANCZOS).save(path)
+
+
+def save_compact_face_image(image, path):
+    root, ext = os.path.splitext(path)
+    width = max(1, round(image.width * COMPACT_FACE_SCALE))
+    height = max(1, round(image.height * COMPACT_FACE_SCALE))
+
+    image.resize((width, height), Image.Resampling.LANCZOS).save(
+        root + "_compact" + ext
+    )
 
 
 def draw_centered_text(draw, font, text, x, y, color):
@@ -542,6 +568,7 @@ def make_fuel_remaining_asset(path):
         Image.Resampling.LANCZOS,
     )
     img.save(path)
+    save_compact_face_image(img, path)
 
 
 def make_fuel_flow_asset(path):
@@ -607,6 +634,7 @@ def make_fuel_flow_asset(path):
         Image.Resampling.LANCZOS,
     )
     img.save(path)
+    save_compact_face_image(img, path)
 
 
 def make_rpm_asset(path):
@@ -652,6 +680,7 @@ def make_rpm_asset(path):
 
     img = img.resize((RPM_FACE_W, RPM_FACE_H), Image.Resampling.LANCZOS)
     img.save(path)
+    save_compact_face_image(img, path)
 
 
 def get_font(size):
