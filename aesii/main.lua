@@ -1,15 +1,27 @@
--- AES-II GI275 STYLE ENGINE WIDGET
--- Full-screen 480x320 Ethos widget
+-- SPDX-License-Identifier: GPL-3.0-or-later
+--
+-- AES-II Engine Telemetry Widget
+-- Copyright (C) 2026 AES-II contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+--
+-- AES-II ENGINE TELEMETRY WIDGET
+-- Ethos widget for the full AES-II dashboard and optional single-panel views.
 -- Widget key must remain: aesii
 --
--- Display:
---   CHT1       boxed RPM       CHT2
---   BAT1                       BAT2
---   Fuel flow and fuel remaining
---
--- Arc segments are rendered as overlapping rotated rectangles.
--- The rectangles are filled in software, avoiding gaps and heavy
--- pixelation from individual radial lines.
+-- Uses PNG gauge faces, stepped needle positions, and label assets from
+-- scripts/aesii/images.
 
 local function name()
     return "AES-II"
@@ -28,32 +40,29 @@ local COL_TEXT     = lcd.RGB(245, 247, 250)
 local COL_LABEL    = lcd.RGB(155, 172, 186)
 local COL_WHITE    = lcd.RGB(255, 255, 255)
 
-local COL_CYAN     = lcd.RGB(0, 190, 225)
 local COL_GREEN    = lcd.RGB(20, 220, 115)
 local COL_YELLOW   = lcd.RGB(255, 210, 0)
 local COL_RED      = lcd.RGB(250, 55, 55)
 
 local FONT_SMALL = SMLSIZE or 0
-local FONT_RPM = DBLSIZE or MIDSIZE or 0
 
-local ARC_BITMAP_SIZE = 135
-local ARC_BITMAP_CENTER_X = 89
-local ARC_BITMAP_CENTER_Y = 89
-local RPM_BITMAP_W = 205
-local RPM_BITMAP_H = 70
-local FUEL_BITMAP_W = 210
-local FUEL_BITMAP_H = 70
-local FUEL_REMAINING_LINE_X = 9
-local FUEL_REMAINING_LINE_W = 170
-local arcTempBitmap = nil
-local arcBattBitmap = nil
-local arcTempBitmaps = {}
-local arcBattBitmaps = {}
+local GAUGE_BITMAP_CENTER_X = 89
+local GAUGE_BITMAP_CENTER_Y = 89
+local RPM_FACE_W = 205
+local RPM_FACE_H = 70
+local FUEL_PANEL_W = 210
+local FUEL_PANEL_H = 70
+local FUEL_SCALE_LINE_X = 9
+local FUEL_SCALE_LINE_W = 170
+local tempGaugeBitmap = nil
+local batteryGaugeBitmap = nil
+local tempGaugeBitmapsByAngle = {}
+local batteryGaugeBitmapsByAngle = {}
 local fuelRemainingBitmap = nil
 local fuelFlowBitmap = nil
 local rpmBaseBitmap = nil
 local labelBitmaps = {}
-local arcBitmapLoadAttempted = false
+local widgetBitmapsLoadAttempted = false
 local bitmapDrawMethod = nil
 
 ------------------------------------------------------------
@@ -138,7 +147,7 @@ local function quantizeAngleDegrees(angleDeg, stepDeg)
     return round(angleDeg / stepDeg) * stepDeg
 end
 
-local function arcDisplayAngle(value, minValue, maxValue)
+local function gaugeNeedleAngle(value, minValue, maxValue)
     if value == nil then
         return nil
     end
@@ -181,20 +190,20 @@ local function tryLoadBitmap(path)
     return nil
 end
 
-local function loadArcBitmaps()
-    if arcBitmapLoadAttempted then
+local function loadWidgetBitmaps()
+    if widgetBitmapsLoadAttempted then
         return
     end
 
-    arcBitmapLoadAttempted = true
+    widgetBitmapsLoadAttempted = true
 
-    local tempPaths = {
+    local tempGaugePaths = {
         "images/arc_temp.png",
         "scripts/aesii/images/arc_temp.png",
         "/scripts/aesii/images/arc_temp.png"
     }
 
-    local battPaths = {
+    local batteryGaugePaths = {
         "images/arc_batt.png",
         "scripts/aesii/images/arc_batt.png",
         "/scripts/aesii/images/arc_batt.png"
@@ -218,18 +227,18 @@ local function loadArcBitmaps()
         "/scripts/aesii/images/rpm_base.png"
     }
 
-    for _, path in ipairs(tempPaths) do
-        arcTempBitmap = tryLoadBitmap(path)
+    for _, path in ipairs(tempGaugePaths) do
+        tempGaugeBitmap = tryLoadBitmap(path)
 
-        if arcTempBitmap ~= nil then
+        if tempGaugeBitmap ~= nil then
             break
         end
     end
 
-    for _, path in ipairs(battPaths) do
-        arcBattBitmap = tryLoadBitmap(path)
+    for _, path in ipairs(batteryGaugePaths) do
+        batteryGaugeBitmap = tryLoadBitmap(path)
 
-        if arcBattBitmap ~= nil then
+        if batteryGaugeBitmap ~= nil then
             break
         end
     end
@@ -259,7 +268,7 @@ local function loadArcBitmaps()
     end
 end
 
-local function loadSteppedArcBitmap(cache, prefix, angleDeg)
+local function loadSteppedGaugeBitmap(cache, prefix, angleDeg)
     if angleDeg == nil then
         return nil
     end
@@ -412,11 +421,11 @@ local function drawLabelBitmap(name, x, y, align)
     return drawBitmapAt(bitmapValue, drawX, round(y))
 end
 
-local function drawArcBitmap(bitmapValue, centerX, centerY)
+local function drawCenteredGaugeBitmap(bitmapValue, centerX, centerY)
     return drawBitmapAt(
         bitmapValue,
-        round(centerX - ARC_BITMAP_CENTER_X),
-        round(centerY - ARC_BITMAP_CENTER_Y)
+        round(centerX - GAUGE_BITMAP_CENTER_X),
+        round(centerY - GAUGE_BITMAP_CENTER_Y)
     )
 end
 
@@ -593,10 +602,10 @@ local function formattedTelemetryKey(widget, telemetry)
     local fuelRemaining = snapshot.fuelRemaining
     local ignitionEnabled = snapshot.ignitionEnabled
     local modeState = snapshot.modeState
-    local cht1Angle = arcDisplayAngle(cht1, cht1Min, cht1Max)
-    local cht2Angle = arcDisplayAngle(cht2, cht2Min, cht2Max)
-    local bat1Angle = arcDisplayAngle(bat1, bat1Min, bat1Max)
-    local bat2Angle = arcDisplayAngle(bat2, bat2Min, bat2Max)
+    local cht1Angle = gaugeNeedleAngle(cht1, cht1Min, cht1Max)
+    local cht2Angle = gaugeNeedleAngle(cht2, cht2Min, cht2Max)
+    local bat1Angle = gaugeNeedleAngle(bat1, bat1Min, bat1Max)
+    local bat2Angle = gaugeNeedleAngle(bat2, bat2Min, bat2Max)
 
     return table.concat({
         widget.kind or "dashboard",
@@ -686,16 +695,8 @@ drawNativeText = function(x, y, text, color, font, align)
     end
 end
 
-local function drawNativeValue(x, y, text, color, align)
-    drawNativeText(x, y, text, color, MIDSIZE or FONT_SMALL, align)
-end
-
 local function drawSmallValue(x, y, text, color, align)
     drawNativeText(x, y, text, color, FONT_SMALL, align)
-end
-
-local function drawRpmValue(x, y, text, color)
-    drawNativeText(x, y, text, color or COL_TEXT, FONT_RPM, "center")
 end
 
 ------------------------------------------------------------
@@ -719,9 +720,9 @@ local function drawBox(x, y, w, h)
     )
 end
 
--- GARMIN-STYLE ARC GAUGE
+-- SEMI-CIRCLE GAUGE
 ------------------------------------------------------------
-local function semiGauge(
+local function drawSemiGauge(
     centerX,
     centerY,
     radius,
@@ -780,17 +781,17 @@ local function semiGauge(
 
     displayAngleDeg = clamp(displayAngleDeg, startAngle, endAngle)
 
-    local activeArcBitmap = arcBitmap
+    local activeGaugeBitmap = arcBitmap
 
     if value ~= nil and steppedBitmaps ~= nil and steppedPrefix ~= nil then
-        activeArcBitmap = loadSteppedArcBitmap(
+        activeGaugeBitmap = loadSteppedGaugeBitmap(
             steppedBitmaps,
             steppedPrefix,
             displayAngleDeg
-        ) or activeArcBitmap
+        ) or activeGaugeBitmap
     end
 
-    drawArcBitmap(activeArcBitmap, centerX, centerY)
+    drawCenteredGaugeBitmap(activeGaugeBitmap, centerX, centerY)
 
     --------------------------------------------------------
     -- Value readout
@@ -812,11 +813,12 @@ local function semiGauge(
     end
     local valueDrawY = valueY or centerY + 12
 
-    drawNativeValue(
+    drawNativeText(
         valueX,
         valueDrawY + 1,
         valueText,
         valueColor,
+        MIDSIZE or FONT_SMALL,
         "center"
     )
 
@@ -831,9 +833,9 @@ local function semiGauge(
 end
 
 ------------------------------------------------------------
--- LARGE BOXED RPM DISPLAY
+-- RPM GAUGE
 ------------------------------------------------------------
-local function rpmBox(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
+local function drawRpmGauge(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
     local position = valuePercent(rpm, 0, maxRpm)
 
     local valueColor = COL_RED
@@ -929,114 +931,9 @@ local function rpmBox(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
 end
 
 ------------------------------------------------------------
--- SEGMENTED HORIZONTAL BAR
+-- FUEL GAUGE
 ------------------------------------------------------------
-local function barGauge(
-    x,
-    y,
-    w,
-    label,
-    value,
-    minValue,
-    maxValue,
-    unit,
-    decimals,
-    zones
-)
-    local labelWidth = 52
-    local valueWidth = 88
-
-    local barX = x + labelWidth
-    local barWidth = w - labelWidth - valueWidth - 8
-    local barHeight = 12
-
-    local position = valuePercent(
-        value,
-        minValue,
-        maxValue
-    )
-
-    local valueColor
-
-    if value == nil then
-        valueColor = COL_RED
-    else
-        valueColor = zoneColor(position, zones)
-    end
-
-    lcd.color(COL_LABEL)
-    lcd.drawText(
-        round(x),
-        round(y - 1),
-        label
-    )
-
-    lcd.color(COL_DIM)
-    lcd.drawFilledRectangle(
-        round(barX),
-        round(y),
-        round(barWidth),
-        barHeight
-    )
-
-    local segmentCount = 18
-    local gap = 2
-
-    local segmentWidth = math.floor(
-        (
-            barWidth -
-            ((segmentCount - 1) * gap)
-        ) / segmentCount
-    )
-
-    local activeSegments = math.floor(
-        segmentCount * position + 0.5
-    )
-
-    for i = 0, segmentCount - 1 do
-        local segmentX =
-            barX + i * (segmentWidth + gap)
-
-        if value ~= nil and i < activeSegments then
-            local segmentPosition =
-                (i + 0.5) / segmentCount
-
-            lcd.color(
-                zoneColor(segmentPosition, zones)
-            )
-        else
-            lcd.color(COL_DIM)
-        end
-
-        lcd.drawFilledRectangle(
-            round(segmentX),
-            round(y),
-            segmentWidth,
-            barHeight
-        )
-    end
-
-    lcd.color(COL_BORDER)
-    lcd.drawRectangle(
-        round(barX),
-        round(y),
-        round(barWidth),
-        barHeight
-    )
-
-    lcd.color(valueColor)
-    lcd.drawText(
-        round(x + w),
-        round(y - 1),
-        formatValue(value, decimals, unit),
-        RIGHT
-    )
-end
-
-------------------------------------------------------------
--- COMPACT AVIONICS-STYLE FUEL STRIP
-------------------------------------------------------------
-local function fuelStrip(
+local function drawFuelGauge(
     x,
     y,
     w,
@@ -1105,8 +1002,8 @@ local function fuelStrip(
 
     if faceStyle == "remaining" or faceStyle == "flow" then
         lineY = y + 38
-        lineX = x + FUEL_REMAINING_LINE_X
-        lineW = FUEL_REMAINING_LINE_W
+        lineX = x + FUEL_SCALE_LINE_X
+        lineW = FUEL_SCALE_LINE_W
     end
 
     if faceStyle == "remaining" or faceStyle == "flow" then
@@ -1303,10 +1200,10 @@ end
 ------------------------------------------------------------
 -- PAINT
 ------------------------------------------------------------
-local function paint(widget)
+local function paintFullDashboard(widget)
     local w, h = lcd.getWindowSize()
 
-    loadArcBitmaps()
+    loadWidgetBitmaps()
 
     --------------------------------------------------------
     -- Telemetry
@@ -1424,7 +1321,7 @@ local function paint(widget)
     --------------------------------------------------------
     -- Temperature gauges
     --------------------------------------------------------
-    semiGauge(
+    drawSemiGauge(
         chtLeftX,
         chtY,
         radius,
@@ -1441,12 +1338,12 @@ local function paint(widget)
         },
         chtLabelY,
         chtValueY,
-        arcTempBitmap,
-        arcTempBitmaps,
+        tempGaugeBitmap,
+        tempGaugeBitmapsByAngle,
         "arc_temp"
     )
 
-    semiGauge(
+    drawSemiGauge(
         chtRightX,
         chtY,
         radius,
@@ -1463,15 +1360,15 @@ local function paint(widget)
         },
         chtLabelY,
         chtValueY,
-        arcTempBitmap,
-        arcTempBitmaps,
+        tempGaugeBitmap,
+        tempGaugeBitmapsByAngle,
         "arc_temp"
     )
 
     --------------------------------------------------------
     -- Battery gauges
     --------------------------------------------------------
-    semiGauge(
+    drawSemiGauge(
         leftX,
         bottomY,
         radius,
@@ -1488,12 +1385,12 @@ local function paint(widget)
         },
         bottomLabelY,
         bottomValueY,
-        arcBattBitmap,
-        arcBattBitmaps,
+        batteryGaugeBitmap,
+        batteryGaugeBitmapsByAngle,
         "arc_batt"
     )
 
-    semiGauge(
+    drawSemiGauge(
         rightX,
         bottomY,
         radius,
@@ -1510,12 +1407,12 @@ local function paint(widget)
         },
         bottomLabelY,
         bottomValueY,
-        arcBattBitmap,
-        arcBattBitmaps,
+        batteryGaugeBitmap,
+        batteryGaugeBitmapsByAngle,
         "arc_batt"
     )
 
-    local stackX = w / 2 - FUEL_BITMAP_W / 2
+    local stackX = w / 2 - FUEL_PANEL_W / 2
     local rpmY = topY - 32
     local flowY = rpmY + 80
     local fuelY = flowY + 80
@@ -1524,11 +1421,11 @@ local function paint(widget)
     --------------------------------------------------------
     -- RPM
     --------------------------------------------------------
-    rpmBox(
-        w / 2 - RPM_BITMAP_W / 2 - 13,
+    drawRpmGauge(
+        w / 2 - RPM_FACE_W / 2 - 13,
         rpmY,
-        RPM_BITMAP_W,
-        RPM_BITMAP_H,
+        RPM_FACE_W,
+        RPM_FACE_H,
         rpm,
         rpmMax,
         rpmIdle,
@@ -1538,10 +1435,10 @@ local function paint(widget)
     --------------------------------------------------------
     -- Fuel section
     --------------------------------------------------------
-    fuelStrip(
+    drawFuelGauge(
         stackX,
         flowY,
-        FUEL_BITMAP_W,
+        FUEL_PANEL_W,
         "FF ML/MIN",
         fuelFlow,
         flowMin,
@@ -1556,10 +1453,10 @@ local function paint(widget)
         "flow"
     )
 
-    fuelStrip(
+    drawFuelGauge(
         stackX,
         fuelY,
-        FUEL_BITMAP_W,
+        FUEL_PANEL_W,
         "FUEL ML",
         fuelRemaining,
         0,
@@ -1598,10 +1495,10 @@ end
 ------------------------------------------------------------
 -- DASHBOARD WIDGET PAINTERS
 ------------------------------------------------------------
-local function preparePanel()
+local function drawPanelBackground()
     local w, h = lcd.getWindowSize()
 
-    loadArcBitmaps()
+    loadWidgetBitmaps()
 
     lcd.color(COL_BG)
     lcd.drawFilledRectangle(0, 0, w, h)
@@ -1615,7 +1512,7 @@ local function preparePanel()
     return w, h
 end
 
-local function dashboardGaugeLayout(w, h)
+local function singleGaugeLayout(w, h)
     local radius = math.floor(
         clamp(math.min(w * 0.35, h * 0.72), 42, 77)
     )
@@ -1627,9 +1524,9 @@ local function dashboardGaugeLayout(w, h)
     return radius, cy, valueY, labelY
 end
 
-local function paintTemperatureGauge(widget, gaugeIndex)
-    local w, h = preparePanel()
-    local radius, cy, valueY, labelY = dashboardGaugeLayout(w, h)
+local function paintTemperaturePanel(widget, gaugeIndex)
+    local w, h = drawPanelBackground()
+    local radius, cy, valueY, labelY = singleGaugeLayout(w, h)
 
     local minValue = widget.t1_min or 10
     local maxValue = widget.t1_max or 150
@@ -1648,7 +1545,7 @@ local function paintTemperatureGauge(widget, gaugeIndex)
     local yellow = thresholdPercent(90, minValue, maxValue)
     local red = thresholdPercent(100, minValue, maxValue)
 
-    semiGauge(
+    drawSemiGauge(
         w * 0.50,
         cy,
         radius,
@@ -1665,15 +1562,15 @@ local function paintTemperatureGauge(widget, gaugeIndex)
         },
         labelY,
         valueY,
-        arcTempBitmap,
-        arcTempBitmaps,
+        tempGaugeBitmap,
+        tempGaugeBitmapsByAngle,
         "arc_temp"
     )
 end
 
-local function paintBatteryGauge(widget, gaugeIndex)
-    local w, h = preparePanel()
-    local radius, cy, valueY, labelY = dashboardGaugeLayout(w, h)
+local function paintBatteryPanel(widget, gaugeIndex)
+    local w, h = drawPanelBackground()
+    local radius, cy, valueY, labelY = singleGaugeLayout(w, h)
 
     local minValue = widget.v1_min or 6.0
     local maxValue = widget.v1_max or 8.4
@@ -1690,7 +1587,7 @@ local function paintBatteryGauge(widget, gaugeIndex)
     local red = thresholdPercent(7.2, minValue, maxValue)
     local yellow = thresholdPercent(7.6, minValue, maxValue)
 
-    semiGauge(
+    drawSemiGauge(
         w * 0.50,
         cy,
         radius,
@@ -1707,22 +1604,22 @@ local function paintBatteryGauge(widget, gaugeIndex)
         },
         labelY,
         valueY,
-        arcBattBitmap,
-        arcBattBitmaps,
+        batteryGaugeBitmap,
+        batteryGaugeBitmapsByAngle,
         "arc_batt"
     )
 end
 
-local function paintRpm(widget)
-    local w, h = preparePanel()
-    local x = math.floor((w - RPM_BITMAP_W) / 2) - 13
-    local y = math.floor((h - RPM_BITMAP_H) / 2)
+local function paintRpmPanel(widget)
+    local w, h = drawPanelBackground()
+    local x = math.floor((w - RPM_FACE_W) / 2) - 13
+    local y = math.floor((h - RPM_FACE_H) / 2)
 
-    rpmBox(
+    drawRpmGauge(
         x,
         y,
-        RPM_BITMAP_W,
-        RPM_BITMAP_H,
+        RPM_FACE_W,
+        RPM_FACE_H,
         getVal(widget.rpm),
         widget.rpm_max or 8500,
         widget.rpm_idle or 800,
@@ -1730,17 +1627,17 @@ local function paintRpm(widget)
     )
 end
 
-local function paintFuel(widget)
-    local w, h = preparePanel()
-    local x = math.floor((w - FUEL_BITMAP_W) / 2)
+local function paintFuelPanel(widget)
+    local w, h = drawPanelBackground()
+    local x = math.floor((w - FUEL_PANEL_W) / 2)
     local gap = 8
-    local totalH = FUEL_BITMAP_H * 2 + gap
+    local totalH = FUEL_PANEL_H * 2 + gap
     local y = math.floor((h - totalH) / 2)
 
-    fuelStrip(
+    drawFuelGauge(
         x,
         y,
-        FUEL_BITMAP_W,
+        FUEL_PANEL_W,
         "FF ML/MIN",
         getVal(widget.fuel_flow),
         widget.ff_min or 0,
@@ -1755,10 +1652,10 @@ local function paintFuel(widget)
         "flow"
     )
 
-    fuelStrip(
+    drawFuelGauge(
         x,
-        y + FUEL_BITMAP_H + gap,
-        FUEL_BITMAP_W,
+        y + FUEL_PANEL_H + gap,
+        FUEL_PANEL_W,
         "FUEL ML",
         getVal(widget.fuel_remaining),
         0,
@@ -1775,21 +1672,46 @@ local function paintFuel(widget)
     )
 end
 
-local function paintDashboard(widget)
+local function paintAnnunciatorsPanel(widget)
+    local w, h = drawPanelBackground()
+    local gap = 10
+    local annunciatorW = math.floor(clamp((w - 28) / 2, 70, 102))
+    local totalW = annunciatorW * 2 + gap
+    local x = math.floor((w - totalW) / 2)
+    local y = math.floor((h - 26) / 2)
+
+    ignitionAnnunciator(
+        x,
+        y,
+        annunciatorW,
+        getVal(widget.ignition)
+    )
+
+    modeAnnunciator(
+        x + annunciatorW + gap,
+        y,
+        annunciatorW,
+        getVal(widget.mode_state)
+    )
+end
+
+local function paintWidget(widget)
     if widget.kind == "temp1" then
-        paintTemperatureGauge(widget, 1)
+        paintTemperaturePanel(widget, 1)
     elseif widget.kind == "temp2" then
-        paintTemperatureGauge(widget, 2)
+        paintTemperaturePanel(widget, 2)
     elseif widget.kind == "bat1" then
-        paintBatteryGauge(widget, 1)
+        paintBatteryPanel(widget, 1)
     elseif widget.kind == "bat2" then
-        paintBatteryGauge(widget, 2)
+        paintBatteryPanel(widget, 2)
     elseif widget.kind == "rpm" then
-        paintRpm(widget)
+        paintRpmPanel(widget)
     elseif widget.kind == "fuel" then
-        paintFuel(widget)
+        paintFuelPanel(widget)
+    elseif widget.kind == "annunciators" then
+        paintAnnunciatorsPanel(widget)
     else
-        paint(widget)
+        paintFullDashboard(widget)
     end
 end
 
@@ -2189,7 +2111,7 @@ local function init()
             return {}
         end,
 
-        paint = paint,
+        paint = paintWidget,
         wakeup = wakeup,
         configure = configure,
         read = read,

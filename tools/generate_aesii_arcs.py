@@ -1,8 +1,26 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# AES-II image asset generator
+# Copyright (C) 2026 AES-II contributors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+"""Generate PNG assets for the AES-II Ethos widget."""
+
 import argparse
 import math
 import os
-import struct
-import zlib
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -11,53 +29,41 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "aesii"))
 IMAGE_DIR = os.path.join(OUT_DIR, "images")
 
-SIZE = 216
-FUEL_W = 210
-FUEL_H = 70
-FUEL_REMAINING_W = 182
-FUEL_REMAINING_H = 70
-FUEL_FLOW_W = 182
-FUEL_FLOW_H = 70
-RPM_W = 205
-RPM_H = 70
-ARC_CROP_W = 135
-ARC_CROP_H = 91
-ARC_CROP_CENTER_X = 89
-ARC_CROP_CENTER_Y = 89
+GAUGE_CANVAS_SIZE = 216
+FUEL_STRIP_W = 182
+FUEL_STRIP_H = 70
+RPM_FACE_W = 205
+RPM_FACE_H = 70
+GAUGE_BITMAP_W = 135
+GAUGE_BITMAP_H = 91
+GAUGE_BITMAP_CENTER_X = 89
+GAUGE_BITMAP_CENTER_Y = 89
 SCALE = 4
-W = SIZE * SCALE
-H = SIZE * SCALE
+CANVAS_W = GAUGE_CANVAS_SIZE * SCALE
+CANVAS_H = GAUGE_CANVAS_SIZE * SCALE
 CENTER_X = 108 * SCALE
 CENTER_Y = 127 * SCALE
 RADIUS = 88 * SCALE
 THICKNESS = 16 * SCALE
-START_DEG = 180
-END_DEG = 300
-ARC_STEP_DEG = 5
+GAUGE_START_DEG = 180
+GAUGE_END_DEG = 300
+GAUGE_STEP_DEG = 5
 
 GREEN = (20, 220, 115, 255)
 YELLOW = (255, 210, 0, 255)
 RED = (250, 55, 55, 255)
-GREY = (120, 130, 140, 255)
-SHADOW_LIGHT = (92, 98, 106, 255)
-CYAN = (0, 190, 225, 255)
-DARK = (8, 10, 14, 255)
-BOX = (17, 21, 28, 255)
-DIM = (42, 49, 58, 255)
 LABEL = (155, 172, 186, 255)
 WHITE = (255, 255, 255, 255)
+TRACK_WHITE = (238, 242, 244, 255)
+TRACK_SHADOW = (46, 52, 60, 200)
 
 FONT_VARIANTS = {
     "label": LABEL,
-    "white": WHITE,
     "green": GREEN,
     "yellow": YELLOW,
-    "red": RED,
 }
 FONT_SPECS = {
     "small": {"size": 17, "w": 11, "h": 20, "y": -1},
-    "value": {"size": 24, "w": 17, "h": 28, "y": -2},
-    "rpm": {"size": 31, "w": 20, "h": 35, "y": -3},
 }
 LABEL_ASSETS = (
     ("ign_label", "IGN", "small", "label"),
@@ -77,7 +83,7 @@ FONT_PATHS = (
 FONT_RENDER_SCALE = 4
 
 
-def color_for_pos(pos, zones):
+def color_for_position(pos, zones):
     color = zones[-1][2]
 
     for start, end, zone_color in zones:
@@ -109,14 +115,14 @@ def blend_over(dst, src, alpha):
     )
 
 
-def draw_arc_band(img, inner, outer, zones):
-    sweep = END_DEG - START_DEG
+def draw_gauge_color_band(img, inner, outer, zones):
+    sweep = GAUGE_END_DEG - GAUGE_START_DEG
     samples = 4
     sample_count = samples * samples
     min_x = max(0, int(CENTER_X - outer - 2))
-    max_x = min(W - 1, int(CENTER_X + outer + 2))
+    max_x = min(CANVAS_W - 1, int(CENTER_X + outer + 2))
     min_y = max(0, int(CENTER_Y - outer - 2))
-    max_y = min(H - 1, int(CENTER_Y + outer + 2))
+    max_y = min(CANVAS_H - 1, int(CENTER_Y + outer + 2))
 
     for y in range(min_y, max_y + 1):
         for x in range(min_x, max_x + 1):
@@ -137,11 +143,11 @@ def draw_arc_band(img, inner, outer, zones):
                     if angle < 0:
                         angle = angle + 360
 
-                    if angle < START_DEG or angle > END_DEG:
+                    if angle < GAUGE_START_DEG or angle > GAUGE_END_DEG:
                         continue
 
-                    pos = (angle - START_DEG) / sweep
-                    r, g, b, _ = color_for_pos(pos, zones)
+                    pos = (angle - GAUGE_START_DEG) / sweep
+                    r, g, b, _ = color_for_position(pos, zones)
                     coverage += 1
                     rs += r
                     gs += g
@@ -161,14 +167,13 @@ def draw_arc_band(img, inner, outer, zones):
                 )
 
 
-def draw_arc_shadow(img, inner, outer, shadow_end_deg):
-    sweep = END_DEG - START_DEG
+def draw_gauge_shadow(img, inner, outer, shadow_end_deg):
     samples = 4
     sample_count = samples * samples
     min_x = max(0, int(CENTER_X - outer - 2))
-    max_x = min(W - 1, int(CENTER_X + outer + 2))
+    max_x = min(CANVAS_W - 1, int(CENTER_X + outer + 2))
     min_y = max(0, int(CENTER_Y - outer - 2))
-    max_y = min(H - 1, int(CENTER_Y + outer + 2))
+    max_y = min(CANVAS_H - 1, int(CENTER_Y + outer + 2))
     bayer = (
         (0, 48, 12, 60, 3, 51, 15, 63),
         (32, 16, 44, 28, 35, 19, 47, 31),
@@ -199,7 +204,7 @@ def draw_arc_shadow(img, inner, outer, shadow_end_deg):
                     if angle < 0:
                         angle = angle + 360
 
-                    if angle < START_DEG or angle > shadow_end_deg:
+                    if angle < GAUGE_START_DEG or angle > shadow_end_deg:
                         continue
 
                     coverage += 1
@@ -238,7 +243,7 @@ def lerp_color(a, b, t):
     )
 
 
-def draw_arc_end_line(img, angle_deg, outer_radius, inner_radius):
+def draw_gauge_end_line(img, angle_deg, outer_radius, inner_radius):
     angle = math.radians(angle_deg)
     cos_a = math.cos(angle)
     sin_a = math.sin(angle)
@@ -260,23 +265,23 @@ def draw_arc_end_line(img, angle_deg, outer_radius, inner_radius):
             px = x + ox
             py = y + oy
 
-            if 0 <= px < W and 0 <= py < H:
+            if 0 <= px < CANVAS_W and 0 <= py < CANVAS_H:
                 img[py][px] = blend_over(img[py][px], WHITE, 1.0)
 
 
-def draw_arc(img, zones, shadow_end_deg=END_DEG):
+def draw_gauge_face(img, zones, shadow_end_deg=GAUGE_END_DEG):
     shadow_outer = RADIUS - 6 * SCALE
     color_thickness = max(6 * SCALE, math.floor(THICKNESS * 0.098))
     shadow_depth = max(28 * SCALE, THICKNESS + 22 * SCALE)
 
-    draw_arc_shadow(
+    draw_gauge_shadow(
         img,
         shadow_outer - shadow_depth,
         shadow_outer,
         shadow_end_deg,
     )
 
-    draw_arc_band(
+    draw_gauge_color_band(
         img,
         RADIUS - color_thickness,
         RADIUS,
@@ -284,8 +289,8 @@ def draw_arc(img, zones, shadow_end_deg=END_DEG):
     )
 
     line_inner = shadow_outer - shadow_depth + 1
-    for angle in (START_DEG, END_DEG):
-        draw_arc_end_line(
+    for angle in (GAUGE_START_DEG, GAUGE_END_DEG):
+        draw_gauge_end_line(
             img,
             angle,
             RADIUS,
@@ -350,74 +355,30 @@ def crop_transparent_image(image, padding=1):
     return image.crop((left, top, right, bottom)), left, top
 
 
-def make_arc_image(zones, shadow_end_deg=END_DEG):
-    img = [[(0, 0, 0, 0) for _ in range(W)] for _ in range(H)]
-    draw_arc(img, zones, shadow_end_deg)
-    downsampled = downsample(img, SIZE, SIZE)
+def make_gauge_face_image(zones, shadow_end_deg=GAUGE_END_DEG):
+    img = [[(0, 0, 0, 0) for _ in range(CANVAS_W)] for _ in range(CANVAS_H)]
+    draw_gauge_face(img, zones, shadow_end_deg)
+    downsampled = downsample(img, GAUGE_CANVAS_SIZE, GAUGE_CANVAS_SIZE)
     image = rgba_rows_to_image(downsampled)
     cropped, _, _ = crop_transparent_image(image, padding=1)
     return cropped
 
 
-def write_png(path, img):
-    height = len(img)
-    width = len(img[0]) if height else 0
-    raw = bytearray()
-    for row in img:
-        raw.append(0)
-        for px in row:
-            raw.extend(px)
+def make_gauge_series(prefix, zones, include_needle=False):
+    make_gauge_face_image(zones, GAUGE_END_DEG).save(
+        os.path.join(IMAGE_DIR, prefix + ".png")
+    )
 
-    def chunk(kind, data):
-        return (
-            struct.pack(">I", len(data))
-            + kind
-            + data
-            + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
-        )
-
-    png = bytearray(b"\x89PNG\r\n\x1a\n")
-    png.extend(chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)))
-    png.extend(chunk(b"IDAT", zlib.compress(bytes(raw), 9)))
-    png.extend(chunk(b"IEND", b""))
-
-    with open(path, "wb") as handle:
-        handle.write(png)
-
-
-def make(path, zones, shadow_end_deg=END_DEG):
-    make_arc_image(zones, shadow_end_deg).save(path)
-
-
-def make_arc_series(prefix, zones, include_needle=False):
-    make_arc_image(zones, END_DEG).save(os.path.join(IMAGE_DIR, prefix + ".png"))
-
-    for angle in range(START_DEG, END_DEG + 1, ARC_STEP_DEG):
-        image = make_arc_image(zones, angle)
+    for angle in range(GAUGE_START_DEG, GAUGE_END_DEG + 1, GAUGE_STEP_DEG):
+        image = make_gauge_face_image(zones, angle)
 
         if include_needle:
-            image = Image.alpha_composite(image, make_arc_needle_image(angle))
+            image = Image.alpha_composite(image, make_gauge_needle_image(angle))
 
         image.save(os.path.join(IMAGE_DIR, "%s_%03d.png" % (prefix, angle)))
 
 
-def fill_rect(img, x, y, w, h, color):
-    height = len(img)
-    width = len(img[0]) if height else 0
-
-    for yy in range(max(0, y), min(height, y + h)):
-        for xx in range(max(0, x), min(width, x + w)):
-            img[yy][xx] = color
-
-
-def stroke_rect(img, x, y, w, h, color, thickness=1):
-    fill_rect(img, x, y, w, thickness, color)
-    fill_rect(img, x, y + h - thickness, w, thickness, color)
-    fill_rect(img, x, y, thickness, h, color)
-    fill_rect(img, x + w - thickness, y, thickness, h, color)
-
-
-def draw_label(draw, font, text, x, y, color):
+def draw_centered_text(draw, font, text, x, y, color):
     bbox = draw.textbbox((0, 0), text, font=font)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
@@ -429,7 +390,17 @@ def draw_label(draw, font, text, x, y, color):
     )
 
 
-def needle_triangle(center_x, center_y, radius, angle_deg):
+def draw_shadowed_rectangle(draw, bounds, fill, shadow=TRACK_SHADOW):
+    x1, y1, x2, y2 = bounds
+
+    draw.rectangle(
+        [x1 + SCALE, y1 + SCALE, x2 + SCALE, y2 + SCALE],
+        fill=shadow,
+    )
+    draw.rectangle(bounds, fill=fill)
+
+
+def gauge_needle_triangle(center_x, center_y, radius, angle_deg):
     thickness = max(8, min(12, int(radius * 0.131)))
     tip_radius = radius - math.floor(thickness / 2)
     base_radius = tip_radius - math.floor(radius * 0.27)
@@ -452,17 +423,17 @@ def needle_triangle(center_x, center_y, radius, angle_deg):
     return [(tip_x, tip_y), base_a, base_b]
 
 
-def make_arc_needle_image(angle_deg):
+def make_gauge_needle_image(angle_deg):
     upscale = 4
     large = Image.new(
         "RGBA",
-        (ARC_CROP_W * upscale, ARC_CROP_H * upscale),
+        (GAUGE_BITMAP_W * upscale, GAUGE_BITMAP_H * upscale),
         (0, 0, 0, 0),
     )
     draw = ImageDraw.Draw(large)
-    center_x = ARC_CROP_CENTER_X * upscale
-    center_y = ARC_CROP_CENTER_Y * upscale
-    points = needle_triangle(center_x, center_y, 88 * upscale, angle_deg)
+    center_x = GAUGE_BITMAP_CENTER_X * upscale
+    center_y = GAUGE_BITMAP_CENTER_Y * upscale
+    points = gauge_needle_triangle(center_x, center_y, 88 * upscale, angle_deg)
     shadow_points = [
         (x + 4, y + 4)
         for x, y in points
@@ -472,14 +443,14 @@ def make_arc_needle_image(angle_deg):
     draw.polygon(points, fill=WHITE)
 
     return large.resize(
-        (ARC_CROP_W, ARC_CROP_H),
+        (GAUGE_BITMAP_W, GAUGE_BITMAP_H),
         Image.Resampling.LANCZOS,
     )
 
 
-def make_fuel_remaining_base(path):
-    width = FUEL_REMAINING_W * SCALE
-    height = FUEL_REMAINING_H * SCALE
+def make_fuel_remaining_asset(path):
+    width = FUEL_STRIP_W * SCALE
+    height = FUEL_STRIP_H * SCALE
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     font = get_font(16 * SCALE)
@@ -490,7 +461,6 @@ def make_fuel_remaining_base(path):
     line_h = 3 * SCALE
     red_w = 6 * SCALE
     quarter = line_w / 4
-    shadow = (46, 52, 60, 200)
 
     draw.rectangle(
         [line_x, line_y, line_x + red_w, line_y + line_h],
@@ -498,52 +468,85 @@ def make_fuel_remaining_base(path):
     )
     draw.rectangle(
         [line_x + red_w, line_y, line_x + line_w, line_y + line_h],
-        fill=(238, 242, 244, 255),
+        fill=TRACK_WHITE,
     )
     draw.rectangle(
-        [line_x, line_y + 2 * SCALE, line_x + line_w, line_y + line_h + 2 * SCALE],
-        fill=shadow,
+        [
+            line_x,
+            line_y + 2 * SCALE,
+            line_x + line_w,
+            line_y + line_h + 2 * SCALE,
+        ],
+        fill=TRACK_SHADOW,
     )
 
-    for fraction in (0.25, 0.50, 0.75):
-        marker_x = int(line_x + quarter * fraction * 4 + 0.5)
-        draw.rectangle(
-            [marker_x - SCALE // 2 + SCALE, line_y - 6 * SCALE + SCALE, marker_x + SCALE // 2 + SCALE, line_y + 8 * SCALE + SCALE],
-            fill=shadow,
-        )
-        draw.rectangle(
-            [marker_x - SCALE // 2, line_y - 6 * SCALE, marker_x + SCALE // 2, line_y + 8 * SCALE],
-            fill=(238, 242, 244, 255),
+    for marker_index in (1, 2, 3):
+        marker_x = int(line_x + quarter * marker_index + 0.5)
+        draw_shadowed_rectangle(
+            draw,
+            [
+                marker_x - SCALE // 2,
+                line_y - 6 * SCALE,
+                marker_x + SCALE // 2,
+                line_y + 8 * SCALE,
+            ],
+            TRACK_WHITE,
         )
 
-    draw.rectangle([line_x + SCALE, line_y - 7 * SCALE + SCALE, line_x + 3 * SCALE + SCALE, line_y + 9 * SCALE + SCALE], fill=shadow)
-    draw.rectangle([line_x, line_y - 7 * SCALE, line_x + 3 * SCALE, line_y + 9 * SCALE], fill=RED)
-    draw.rectangle([line_x + int(quarter) + SCALE, line_y - 5 * SCALE + SCALE, line_x + int(quarter) + 2 * SCALE + SCALE, line_y + 7 * SCALE + SCALE], fill=shadow)
-    draw.rectangle([line_x + int(quarter), line_y - 5 * SCALE, line_x + int(quarter) + 2 * SCALE, line_y + 7 * SCALE], fill=(238, 242, 244, 255))
-    draw.rectangle([line_x + int(quarter * 2) + SCALE, line_y - 5 * SCALE + SCALE, line_x + int(quarter * 2) + 2 * SCALE + SCALE, line_y + 7 * SCALE + SCALE], fill=shadow)
-    draw.rectangle([line_x + int(quarter * 2), line_y - 5 * SCALE, line_x + int(quarter * 2) + 2 * SCALE, line_y + 7 * SCALE], fill=(238, 242, 244, 255))
-    draw.rectangle([line_x + int(quarter * 3) + SCALE, line_y - 5 * SCALE + SCALE, line_x + int(quarter * 3) + 2 * SCALE + SCALE, line_y + 7 * SCALE + SCALE], fill=shadow)
-    draw.rectangle([line_x + int(quarter * 3), line_y - 5 * SCALE, line_x + int(quarter * 3) + 2 * SCALE, line_y + 7 * SCALE], fill=(238, 242, 244, 255))
-    draw.rectangle([line_x + line_w - 3 * SCALE + SCALE, line_y - 7 * SCALE + SCALE, line_x + line_w + SCALE, line_y + 9 * SCALE + SCALE], fill=shadow)
-    draw.rectangle([line_x + line_w - 3 * SCALE, line_y - 7 * SCALE, line_x + line_w, line_y + 9 * SCALE], fill=GREEN)
+    draw_shadowed_rectangle(
+        draw,
+        [line_x, line_y - 7 * SCALE, line_x + 3 * SCALE, line_y + 9 * SCALE],
+        RED,
+    )
 
-    draw_label(draw, font, "FUEL QTY", width // 2 - 45 * SCALE, 12 * SCALE, LABEL)
-    draw_label(draw, font, "0", line_x, 58 * SCALE, LABEL)
-    draw_label(draw, font, "25", line_x + quarter, 58 * SCALE, LABEL)
-    draw_label(draw, font, "50", line_x + quarter * 2, 58 * SCALE, LABEL)
-    draw_label(draw, font, "75", line_x + quarter * 3, 58 * SCALE, LABEL)
-    draw_label(draw, font, "F", line_x + line_w, 58 * SCALE, LABEL)
+    for marker_index in (1, 2, 3):
+        marker_x = line_x + int(quarter * marker_index)
+        draw_shadowed_rectangle(
+            draw,
+            [
+                marker_x,
+                line_y - 5 * SCALE,
+                marker_x + 2 * SCALE,
+                line_y + 7 * SCALE,
+            ],
+            TRACK_WHITE,
+        )
+
+    draw_shadowed_rectangle(
+        draw,
+        [
+            line_x + line_w - 3 * SCALE,
+            line_y - 7 * SCALE,
+            line_x + line_w,
+            line_y + 9 * SCALE,
+        ],
+        GREEN,
+    )
+
+    draw_centered_text(
+        draw,
+        font,
+        "FUEL QTY",
+        width // 2 - 45 * SCALE,
+        12 * SCALE,
+        LABEL,
+    )
+    draw_centered_text(draw, font, "0", line_x, 58 * SCALE, LABEL)
+    draw_centered_text(draw, font, "25", line_x + quarter, 58 * SCALE, LABEL)
+    draw_centered_text(draw, font, "50", line_x + quarter * 2, 58 * SCALE, LABEL)
+    draw_centered_text(draw, font, "75", line_x + quarter * 3, 58 * SCALE, LABEL)
+    draw_centered_text(draw, font, "F", line_x + line_w, 58 * SCALE, LABEL)
 
     img = img.resize(
-        (FUEL_REMAINING_W, FUEL_REMAINING_H),
+        (FUEL_STRIP_W, FUEL_STRIP_H),
         Image.Resampling.LANCZOS,
     )
     img.save(path)
 
 
-def make_fuel_flow_base(path):
-    width = FUEL_FLOW_W * SCALE
-    height = FUEL_FLOW_H * SCALE
+def make_fuel_flow_asset(path):
+    width = FUEL_STRIP_W * SCALE
+    height = FUEL_STRIP_H * SCALE
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     font = get_font(16 * SCALE)
@@ -554,7 +557,6 @@ def make_fuel_flow_base(path):
     line_h = 3 * SCALE
     red_w = 6 * SCALE
     yellow_start = int(line_x + line_w * 0.80)
-    shadow = (46, 52, 60, 200)
 
     draw.rectangle(
         [line_x, line_y, line_x + red_w, line_y + line_h],
@@ -562,67 +564,93 @@ def make_fuel_flow_base(path):
     )
     draw.rectangle(
         [line_x + red_w, line_y, yellow_start, line_y + line_h],
-        fill=(238, 242, 244, 255),
+        fill=TRACK_WHITE,
     )
     draw.rectangle(
         [yellow_start, line_y, line_x + line_w, line_y + line_h],
         fill=WHITE,
     )
     draw.rectangle(
-        [line_x, line_y + 2 * SCALE, line_x + line_w, line_y + line_h + 2 * SCALE],
-        fill=shadow,
+        [
+            line_x,
+            line_y + 2 * SCALE,
+            line_x + line_w,
+            line_y + line_h + 2 * SCALE,
+        ],
+        fill=TRACK_SHADOW,
     )
 
-    draw_label(draw, font, "FF ML/MIN", width // 2 - 45 * SCALE, 12 * SCALE, LABEL)
+    draw_centered_text(
+        draw,
+        font,
+        "FF ML/MIN",
+        width // 2 - 45 * SCALE,
+        12 * SCALE,
+        LABEL,
+    )
     draw.rectangle(
         [line_x, line_y - 7 * SCALE, line_x + 2 * SCALE, line_y + 9 * SCALE],
         fill=WHITE,
     )
     draw.rectangle(
-        [line_x + line_w - 2 * SCALE, line_y - 7 * SCALE, line_x + line_w, line_y + 9 * SCALE],
+        [
+            line_x + line_w - 2 * SCALE,
+            line_y - 7 * SCALE,
+            line_x + line_w,
+            line_y + 9 * SCALE,
+        ],
         fill=WHITE,
     )
 
     img = img.resize(
-        (FUEL_FLOW_W, FUEL_FLOW_H),
+        (FUEL_STRIP_W, FUEL_STRIP_H),
         Image.Resampling.LANCZOS,
     )
     img.save(path)
 
 
-def make_rpm_base(path):
-    width = RPM_W * SCALE
-    height = RPM_H * SCALE
+def make_rpm_asset(path):
+    width = RPM_FACE_W * SCALE
+    height = RPM_FACE_H * SCALE
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     font = get_font(16 * SCALE)
-    shadow = (46, 52, 60, 200)
 
     line_x = 20 * SCALE
     line_y = 37 * SCALE
     line_w = 170 * SCALE
     line_h = 3 * SCALE
 
-    draw_label(draw, font, "RPM", 36 * SCALE, 10 * SCALE, LABEL)
+    draw_centered_text(draw, font, "RPM", 36 * SCALE, 10 * SCALE, LABEL)
 
     draw.rectangle(
         [line_x, line_y, line_x + line_w, line_y + line_h],
-        fill=(238, 242, 244, 255),
+        fill=TRACK_WHITE,
     )
     draw.rectangle(
-        [line_x, line_y + 2 * SCALE, line_x + line_w, line_y + line_h + 2 * SCALE],
-        fill=shadow,
+        [
+            line_x,
+            line_y + 2 * SCALE,
+            line_x + line_w,
+            line_y + line_h + 2 * SCALE,
+        ],
+        fill=TRACK_SHADOW,
     )
     draw.rectangle(
         [line_x, line_y - 7 * SCALE, line_x + 2 * SCALE, line_y + 9 * SCALE],
         fill=WHITE,
     )
     draw.rectangle(
-        [line_x + line_w - 2 * SCALE, line_y - 7 * SCALE, line_x + line_w, line_y + 9 * SCALE],
+        [
+            line_x + line_w - 2 * SCALE,
+            line_y - 7 * SCALE,
+            line_x + line_w,
+            line_y + 9 * SCALE,
+        ],
         fill=WHITE,
     )
 
-    img = img.resize((RPM_W, RPM_H), Image.Resampling.LANCZOS)
+    img = img.resize((RPM_FACE_W, RPM_FACE_H), Image.Resampling.LANCZOS)
     img.save(path)
 
 
@@ -715,7 +743,7 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     os.makedirs(IMAGE_DIR, exist_ok=True)
     if not selected or args.all or args.arc_temp:
-        make_arc_series(
+        make_gauge_series(
             "arc_temp",
             [
                 (0.00, (90 - 10) / (150 - 10), GREEN),
@@ -725,7 +753,7 @@ def main():
             True,
         )
     if not selected or args.all or args.arc_batt:
-        make_arc_series(
+        make_gauge_series(
             "arc_batt",
             [
                 (0.00, (7.2 - 6.0) / (8.4 - 6.0), RED),
@@ -735,11 +763,11 @@ def main():
             True,
         )
     if not selected or args.all or args.fuel_remaining:
-        make_fuel_remaining_base(os.path.join(IMAGE_DIR, "fuel_remaining.png"))
+        make_fuel_remaining_asset(os.path.join(IMAGE_DIR, "fuel_remaining.png"))
     if not selected or args.all or args.fuel_flow:
-        make_fuel_flow_base(os.path.join(IMAGE_DIR, "fuel_flow.png"))
+        make_fuel_flow_asset(os.path.join(IMAGE_DIR, "fuel_flow.png"))
     if not selected or args.all or args.rpm_base:
-        make_rpm_base(os.path.join(IMAGE_DIR, "rpm_base.png"))
+        make_rpm_asset(os.path.join(IMAGE_DIR, "rpm_base.png"))
 
     if not selected or args.all or args.labels:
         make_label_assets()
