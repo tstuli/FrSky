@@ -827,6 +827,10 @@ local function fullDashboardLayout(w, h)
         minRadius = 60,
         maxRadius = 88,
         fuelPanelW = FUEL_PANEL_W,
+        rpmFaceW = RPM_FACE_W,
+        rpmFaceH = RPM_FACE_H,
+        rpmFaceScale = 1,
+        fuelFaceScale = 1,
         rpmXOffset = -13,
         rpmYOffset = -32,
         stackGapY = 80,
@@ -846,14 +850,20 @@ local function fullDashboardLayout(w, h)
         layout.radiusBias = 8
         layout.minRadius = 56
         layout.maxRadius = 66
-        layout.fuelPanelW = FUEL_FACE_W
-        layout.rpmXOffset = 0
+        layout.fuelPanelW = COMPACT_FUEL_FACE_W
+        layout.rpmFaceW = COMPACT_RPM_FACE_W
+        layout.rpmFaceH = COMPACT_RPM_FACE_H
+        layout.rpmFaceScale = COMPACT_FACE_SCALE
+        layout.fuelFaceScale = COMPACT_FACE_SCALE
+        layout.centerStackXOffset = -18
+        layout.rpmXOffset = -18
         layout.rpmYOffset = -22
-        layout.stackGapY = 58
+        layout.stackGapY = 55
         layout.annunciatorOffsetY = 72
         layout.annunciatorW = 88
         layout.annunciatorGap = 8
         layout.showAnnunciators = false
+        layout.gaugeXOffset = 8
         layout.gaugeLayout = {
             minLabelX = -1,
             minLabelY = 8,
@@ -862,13 +872,17 @@ local function fullDashboardLayout(w, h)
             valueXFactor = 0.08,
             chtLabelAdjust = 1,
             bitmapCenterX = COMPACT_GAUGE_BITMAP_CENTER_X,
-            bitmapCenterY = COMPACT_GAUGE_BITMAP_CENTER_Y
+            bitmapCenterY = COMPACT_GAUGE_BITMAP_CENTER_Y,
+            hideScaleLabels = true,
+            valueYOffset = -16,
+            labelYOffset = -4
         }
+        layout.batteryYOffset = 8
     end
 
     layout.mainPanelH = h - layout.mainPanelY - 8
-    layout.leftX = layout.sideX
-    layout.rightX = w - layout.sideX
+    layout.leftX = layout.sideX + (layout.gaugeXOffset or 0)
+    layout.rightX = w - layout.sideX + (layout.gaugeXOffset or 0)
     layout.chtLeftX = layout.leftX - layout.chtXOffset
     layout.chtRightX = layout.rightX + layout.chtXOffset
     layout.chtY = layout.topY + 36
@@ -879,12 +893,18 @@ local function fullDashboardLayout(w, h)
             layout.maxRadius
         )
     )
-    layout.chtValueY = layout.chtY + 1
-    layout.chtLabelY = layout.chtValueY + 23
+    layout.chtValueY = layout.chtY + 1 + (layout.gaugeLayout and layout.gaugeLayout.valueYOffset or 0)
+    layout.chtLabelY = layout.chtValueY + 23 + (layout.gaugeLayout and layout.gaugeLayout.labelYOffset or 0)
     layout.bottomValueY = layout.bottomY + 3
     layout.bottomLabelY = layout.bottomValueY + 23
-    layout.stackX = math.floor((w - layout.fuelPanelW) / 2)
-    layout.rpmX = math.floor((w - RPM_FACE_W) / 2) + layout.rpmXOffset
+    layout.batteryY = layout.bottomY + (layout.batteryYOffset or 0)
+    layout.batteryValueY = layout.bottomValueY + (layout.batteryYOffset or 0) +
+        (layout.gaugeLayout and layout.gaugeLayout.valueYOffset or 0)
+    layout.batteryLabelY = layout.batteryValueY + 23 +
+        (layout.gaugeLayout and layout.gaugeLayout.labelYOffset or 0)
+    layout.stackX = math.floor((w - layout.fuelPanelW) / 2) +
+        (layout.centerStackXOffset or 0)
+    layout.rpmX = math.floor((w - layout.rpmFaceW) / 2) + layout.rpmXOffset
     layout.rpmY = layout.topY + layout.rpmYOffset
     layout.flowY = layout.rpmY + layout.stackGapY
     layout.fuelY = layout.flowY + layout.stackGapY
@@ -928,26 +948,28 @@ local function drawSemiGauge(
         clamp(radius * 0.131, 8, 12)
     )
 
-    local minLabelAngle = math.rad(startAngle)
-    local minLabelRadius = radius - thickness - (layout.minLabelInset or 1)
+    if not layout.hideScaleLabels then
+        local minLabelAngle = math.rad(startAngle)
+        local minLabelRadius = radius - thickness - (layout.minLabelInset or 1)
 
-    drawTinyText(
-        round(centerX + math.cos(minLabelAngle) * minLabelRadius + (layout.minLabelX or -3)),
-        round(centerY + math.sin(minLabelAngle) * minLabelRadius + (layout.minLabelY or 9)),
-        formatValue(minValue, decimals, nil),
-        COL_LABEL
-    )
+        drawTinyText(
+            round(centerX + math.cos(minLabelAngle) * minLabelRadius + (layout.minLabelX or -3)),
+            round(centerY + math.sin(minLabelAngle) * minLabelRadius + (layout.minLabelY or 9)),
+            formatValue(minValue, decimals, nil),
+            COL_LABEL
+        )
 
-    local maxLabelAngle = math.rad(endAngle)
-    local maxLabelRadius = radius - thickness - (layout.maxLabelInset or 2)
+        local maxLabelAngle = math.rad(endAngle)
+        local maxLabelRadius = radius - thickness - (layout.maxLabelInset or 2)
 
-    drawTinyText(
-        round(centerX + math.cos(maxLabelAngle) * maxLabelRadius + (layout.maxLabelX or 38)),
-        round(centerY + math.sin(maxLabelAngle) * maxLabelRadius + (layout.maxLabelY or 8)),
-        formatValue(maxValue, decimals, nil),
-        COL_LABEL,
-        RIGHT
-    )
+        drawTinyText(
+            round(centerX + math.cos(maxLabelAngle) * maxLabelRadius + (layout.maxLabelX or 38)),
+            round(centerY + math.sin(maxLabelAngle) * maxLabelRadius + (layout.maxLabelY or 8)),
+            formatValue(maxValue, decimals, nil),
+            COL_LABEL,
+            RIGHT
+        )
+    end
 
     --------------------------------------------------------
     -- Pointer
@@ -1020,7 +1042,19 @@ end
 ------------------------------------------------------------
 -- RPM GAUGE
 ------------------------------------------------------------
-local function drawRpmGauge(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
+local function drawRpmGauge(
+    x,
+    y,
+    w,
+    h,
+    rpm,
+    maxRpm,
+    idleRpm,
+    redlineRpm,
+    baseBitmap,
+    faceScale
+)
+    faceScale = faceScale or 1
     local position = valuePercent(rpm, 0, maxRpm)
 
     local valueColor = COL_RED
@@ -1040,7 +1074,7 @@ local function drawRpmGauge(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
     end
 
     drawBitmapAt(
-        rpmBaseBitmap,
+        baseBitmap or rpmBaseBitmap,
         round(x),
         round(y)
     )
@@ -1048,9 +1082,9 @@ local function drawRpmGauge(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
     --------------------------------------------------------
     -- RPM load bar
     --------------------------------------------------------
-    local barX = x + 20
-    local barY = y + 37
-    local barW = 170
+    local barX = x + 20 * faceScale
+    local barY = y + 37 * faceScale
+    local barW = 170 * faceScale
     local barRightX = barX + barW - 1
     local idlePosition = valuePercent(idleRpm or 800, 0, maxRpm)
     local redlinePosition = valuePercent(redlineRpm or 8000, 0, maxRpm)
@@ -1069,9 +1103,9 @@ local function drawRpmGauge(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
     lcd.color(COL_GREEN)
     lcd.drawFilledRectangle(
         round(idleX - 1),
-        round(barY - 4),
-        2,
-        8
+        round(barY - 4 * faceScale),
+        math.max(1, round(2 * faceScale)),
+        math.max(5, round(8 * faceScale))
     )
 
     local redlineStart = round(redlineX)
@@ -1081,25 +1115,25 @@ local function drawRpmGauge(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
         lcd.color(COL_RED)
         lcd.drawFilledRectangle(
             redlineStart,
-            round(barY - 4),
+            round(barY - 4 * faceScale),
             redlineWidth,
-            8
+            math.max(5, round(8 * faceScale))
         )
     end
 
     drawSmallValue(
         x + w - 2,
-        barY - 9,
+        barY - 9 * faceScale,
         rpmText,
         rpmValueColor,
         "left"
     )
 
-    local scaleLabelY = barY + 13
+    local scaleLabelY = barY + 13 * faceScale
     local minText = "0"
     local maxText = tostring(round(maxRpm))
-    local minX = barX + 5
-    local maxX = barX + barW + 6
+    local minX = barX + 5 * faceScale
+    local maxX = barX + barW + 6 * faceScale
 
     drawNativeText(minX, scaleLabelY, minText, COL_LABEL, FONT_SMALL, "right")
     drawNativeText(maxX, scaleLabelY, maxText, COL_LABEL, FONT_SMALL, "right")
@@ -1107,10 +1141,10 @@ local function drawRpmGauge(x, y, w, h, rpm, maxRpm, idleRpm, redlineRpm)
     if rpm ~= nil then
         lcd.color(valueColor)
         lcd.drawFilledRectangle(
-            round(markerX - 2),
-            round(barY - 10),
-            4,
-            20
+            round(markerX - 2 * faceScale),
+            round(barY - 10 * faceScale),
+            math.max(2, round(4 * faceScale)),
+            math.max(12, round(20 * faceScale))
         )
     end
 end
@@ -1130,8 +1164,10 @@ local function drawFuelGauge(
     decimals,
     zones,
     baseBitmap,
-    faceStyle
+    faceStyle,
+    faceScale
 )
+    faceScale = faceScale or 1
     local effectiveMin = minValue or 0
     local effectiveMax = maxValue or effectiveMin
 
@@ -1181,14 +1217,14 @@ local function drawFuelGauge(
         )
     end
 
-    local lineY = y + 43
-    local lineX = x + 10
-    local lineW = 130
+    local lineY = y + 43 * faceScale
+    local lineX = x + 10 * faceScale
+    local lineW = 130 * faceScale
 
     if faceStyle == "remaining" or faceStyle == "flow" then
-        lineY = y + 38
-        lineX = x + FUEL_SCALE_LINE_X
-        lineW = FUEL_SCALE_LINE_W
+        lineY = y + 38 * faceScale
+        lineX = x + FUEL_SCALE_LINE_X * faceScale
+        lineW = FUEL_SCALE_LINE_W * faceScale
     end
 
     if faceStyle == "remaining" or faceStyle == "flow" then
@@ -1237,9 +1273,15 @@ local function drawFuelGauge(
             )
         end
 
+        local valueTextX = x + w - 20 * faceScale
+
+        if faceScale < 1 then
+            valueTextX = x + w + 18
+        end
+
         drawSmallValue(
-            x + w - 20,
-            lineY - 10,
+            valueTextX,
+            lineY - 10 * faceScale,
             stripValueText,
             valueColor,
             "left"
@@ -1247,14 +1289,14 @@ local function drawFuelGauge(
     end
 
     if faceStyle == "flow" then
-        local labelY = lineY + 21
+        local labelY = lineY + 21 * faceScale
         local minText = formatValue(round(effectiveMin), 0, unit)
         local maxText = formatValue(round(effectiveMax), 0, unit)
-        local minX = lineX + 5
-        local maxX = lineX + lineW + 6
+        local minX = lineX + 5 * faceScale
+        local maxX = lineX + lineW + 6 * faceScale
 
-        drawNativeText(minX, labelY - 8, minText, COL_LABEL, 0, "right")
-        drawNativeText(maxX, labelY - 10, maxText, COL_LABEL, 0, "right")
+        drawNativeText(minX, labelY - 8 * faceScale, minText, COL_LABEL, 0, "right")
+        drawNativeText(maxX, labelY - 10 * faceScale, maxText, COL_LABEL, 0, "right")
     end
 
     local markerPosition = clamp(position, 0, 1)
@@ -1262,10 +1304,10 @@ local function drawFuelGauge(
 
     lcd.color(valueColor)
     lcd.drawFilledRectangle(
-        round(markerX - 2),
-        round(lineY - 10),
-        4,
-        20
+        round(markerX - 2 * faceScale),
+        round(lineY - 10 * faceScale),
+        math.max(2, round(4 * faceScale)),
+        math.max(12, round(20 * faceScale))
     )
 
     if faceStyle == "remaining" or faceStyle == "flow" then
@@ -1481,6 +1523,9 @@ local function paintFullDashboard(widget)
     local activeBatteryGaugeBitmapsByAngle = batteryGaugeBitmapsByAngle
     local activeTempGaugePrefix = "arc_temp"
     local activeBatteryGaugePrefix = "arc_batt"
+    local activeRpmBaseBitmap = rpmBaseBitmap
+    local activeFuelFlowBitmap = fuelFlowBitmap
+    local activeFuelRemainingBitmap = fuelRemainingBitmap
 
     if layout.compact then
         activeTempGaugeBitmap = compactTempGaugeBitmap or tempGaugeBitmap
@@ -1489,6 +1534,9 @@ local function paintFullDashboard(widget)
         activeBatteryGaugeBitmapsByAngle = compactBatteryGaugeBitmapsByAngle
         activeTempGaugePrefix = "arc_temp_compact"
         activeBatteryGaugePrefix = "arc_batt_compact"
+        activeRpmBaseBitmap = compactRpmBaseBitmap or rpmBaseBitmap
+        activeFuelFlowBitmap = compactFuelFlowBitmap or fuelFlowBitmap
+        activeFuelRemainingBitmap = compactFuelRemainingBitmap or fuelRemainingBitmap
     end
 
     drawBox(8, layout.mainPanelY, w - 16, layout.mainPanelH)
@@ -1547,7 +1595,7 @@ local function paintFullDashboard(widget)
     --------------------------------------------------------
     drawSemiGauge(
         layout.leftX,
-        layout.bottomY,
+        layout.batteryY,
         layout.radius,
         bat1,
         bat1Min,
@@ -1560,8 +1608,8 @@ local function paintFullDashboard(widget)
             {bat1Red, bat1Yellow, COL_YELLOW},
             {bat1Yellow, 1.00, COL_GREEN}
         },
-        layout.bottomLabelY,
-        layout.bottomValueY,
+        layout.batteryLabelY,
+        layout.batteryValueY,
         activeBatteryGaugeBitmap,
         activeBatteryGaugeBitmapsByAngle,
         activeBatteryGaugePrefix,
@@ -1570,7 +1618,7 @@ local function paintFullDashboard(widget)
 
     drawSemiGauge(
         layout.rightX,
-        layout.bottomY,
+        layout.batteryY,
         layout.radius,
         bat2,
         bat2Min,
@@ -1583,8 +1631,8 @@ local function paintFullDashboard(widget)
             {bat2Red, bat2Yellow, COL_YELLOW},
             {bat2Yellow, 1.00, COL_GREEN}
         },
-        layout.bottomLabelY,
-        layout.bottomValueY,
+        layout.batteryLabelY,
+        layout.batteryValueY,
         activeBatteryGaugeBitmap,
         activeBatteryGaugeBitmapsByAngle,
         activeBatteryGaugePrefix,
@@ -1597,12 +1645,14 @@ local function paintFullDashboard(widget)
     drawRpmGauge(
         layout.rpmX,
         layout.rpmY,
-        RPM_FACE_W,
-        RPM_FACE_H,
+        layout.rpmFaceW,
+        layout.rpmFaceH,
         rpm,
         rpmMax,
         rpmIdle,
-        rpmRedline
+        rpmRedline,
+        activeRpmBaseBitmap,
+        layout.rpmFaceScale
     )
 
     --------------------------------------------------------
@@ -1622,8 +1672,9 @@ local function paintFullDashboard(widget)
             {0.00, 0.80, COL_GREEN},
             {0.80, 1.00, COL_YELLOW}
         },
-        fuelFlowBitmap,
-        "flow"
+        activeFuelFlowBitmap,
+        "flow",
+        layout.fuelFaceScale
     )
 
     drawFuelGauge(
@@ -1641,8 +1692,9 @@ local function paintFullDashboard(widget)
             {0.15, 0.30, COL_YELLOW},
             {0.30, 1.00, COL_GREEN}
         },
-        fuelRemainingBitmap,
-        "remaining"
+        activeFuelRemainingBitmap,
+        "remaining",
+        layout.fuelFaceScale
     )
 
     if layout.showAnnunciators then
