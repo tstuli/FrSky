@@ -48,19 +48,34 @@ local FONT_SMALL = SMLSIZE or 0
 
 local GAUGE_BITMAP_CENTER_X = 89
 local GAUGE_BITMAP_CENTER_Y = 89
+local COMPACT_GAUGE_BITMAP_CENTER_X = 67
+local COMPACT_GAUGE_BITMAP_CENTER_Y = 67
 local RPM_FACE_W = 205
 local RPM_FACE_H = 70
+local COMPACT_FACE_SCALE = 0.84
+local COMPACT_RPM_FACE_W = 172
+local COMPACT_RPM_FACE_H = 59
 local FUEL_PANEL_W = 210
 local FUEL_PANEL_H = 70
+local FUEL_FACE_W = 182
+local COMPACT_FUEL_FACE_W = 153
+local COMPACT_FUEL_FACE_H = 59
 local FUEL_SCALE_LINE_X = 9
 local FUEL_SCALE_LINE_W = 170
 local tempGaugeBitmap = nil
 local batteryGaugeBitmap = nil
+local compactTempGaugeBitmap = nil
+local compactBatteryGaugeBitmap = nil
 local tempGaugeBitmapsByAngle = {}
 local batteryGaugeBitmapsByAngle = {}
+local compactTempGaugeBitmapsByAngle = {}
+local compactBatteryGaugeBitmapsByAngle = {}
 local fuelRemainingBitmap = nil
 local fuelFlowBitmap = nil
 local rpmBaseBitmap = nil
+local compactFuelRemainingBitmap = nil
+local compactFuelFlowBitmap = nil
+local compactRpmBaseBitmap = nil
 local labelBitmaps = {}
 local widgetBitmapsLoadAttempted = false
 local bitmapDrawMethod = nil
@@ -209,10 +224,28 @@ local function loadWidgetBitmaps()
         "/scripts/aesii/images/arc_batt.png"
     }
 
+    local compactTempGaugePaths = {
+        "images/arc_temp_compact.png",
+        "scripts/aesii/images/arc_temp_compact.png",
+        "/scripts/aesii/images/arc_temp_compact.png"
+    }
+
+    local compactBatteryGaugePaths = {
+        "images/arc_batt_compact.png",
+        "scripts/aesii/images/arc_batt_compact.png",
+        "/scripts/aesii/images/arc_batt_compact.png"
+    }
+
     local fuelRemainingPaths = {
         "images/fuel_remaining.png",
         "scripts/aesii/images/fuel_remaining.png",
         "/scripts/aesii/images/fuel_remaining.png"
+    }
+
+    local compactFuelRemainingPaths = {
+        "images/fuel_remaining_compact.png",
+        "scripts/aesii/images/fuel_remaining_compact.png",
+        "/scripts/aesii/images/fuel_remaining_compact.png"
     }
 
     local fuelFlowPaths = {
@@ -221,10 +254,22 @@ local function loadWidgetBitmaps()
         "/scripts/aesii/images/fuel_flow.png"
     }
 
+    local compactFuelFlowPaths = {
+        "images/fuel_flow_compact.png",
+        "scripts/aesii/images/fuel_flow_compact.png",
+        "/scripts/aesii/images/fuel_flow_compact.png"
+    }
+
     local rpmBasePaths = {
         "images/rpm_base.png",
         "scripts/aesii/images/rpm_base.png",
         "/scripts/aesii/images/rpm_base.png"
+    }
+
+    local compactRpmBasePaths = {
+        "images/rpm_base_compact.png",
+        "scripts/aesii/images/rpm_base_compact.png",
+        "/scripts/aesii/images/rpm_base_compact.png"
     }
 
     for _, path in ipairs(tempGaugePaths) do
@@ -243,10 +288,34 @@ local function loadWidgetBitmaps()
         end
     end
 
+    for _, path in ipairs(compactTempGaugePaths) do
+        compactTempGaugeBitmap = tryLoadBitmap(path)
+
+        if compactTempGaugeBitmap ~= nil then
+            break
+        end
+    end
+
+    for _, path in ipairs(compactBatteryGaugePaths) do
+        compactBatteryGaugeBitmap = tryLoadBitmap(path)
+
+        if compactBatteryGaugeBitmap ~= nil then
+            break
+        end
+    end
+
     for _, path in ipairs(fuelRemainingPaths) do
         fuelRemainingBitmap = tryLoadBitmap(path)
 
         if fuelRemainingBitmap ~= nil then
+            break
+        end
+    end
+
+    for _, path in ipairs(compactFuelRemainingPaths) do
+        compactFuelRemainingBitmap = tryLoadBitmap(path)
+
+        if compactFuelRemainingBitmap ~= nil then
             break
         end
     end
@@ -259,10 +328,26 @@ local function loadWidgetBitmaps()
         end
     end
 
+    for _, path in ipairs(compactFuelFlowPaths) do
+        compactFuelFlowBitmap = tryLoadBitmap(path)
+
+        if compactFuelFlowBitmap ~= nil then
+            break
+        end
+    end
+
     for _, path in ipairs(rpmBasePaths) do
         rpmBaseBitmap = tryLoadBitmap(path)
 
         if rpmBaseBitmap ~= nil then
+            break
+        end
+    end
+
+    for _, path in ipairs(compactRpmBasePaths) do
+        compactRpmBaseBitmap = tryLoadBitmap(path)
+
+        if compactRpmBaseBitmap ~= nil then
             break
         end
     end
@@ -421,11 +506,20 @@ local function drawLabelBitmap(name, x, y, align)
     return drawBitmapAt(bitmapValue, drawX, round(y))
 end
 
-local function drawCenteredGaugeBitmap(bitmapValue, centerX, centerY)
+local function drawCenteredGaugeBitmap(
+    bitmapValue,
+    centerX,
+    centerY,
+    bitmapCenterX,
+    bitmapCenterY
+)
+    bitmapCenterX = bitmapCenterX or GAUGE_BITMAP_CENTER_X
+    bitmapCenterY = bitmapCenterY or GAUGE_BITMAP_CENTER_Y
+
     return drawBitmapAt(
         bitmapValue,
-        round(centerX - GAUGE_BITMAP_CENTER_X),
-        round(centerY - GAUGE_BITMAP_CENTER_Y)
+        round(centerX - bitmapCenterX),
+        round(centerY - bitmapCenterY)
     )
 end
 
@@ -720,6 +814,88 @@ local function drawBox(x, y, w, h)
     )
 end
 
+local function fullDashboardLayout(w, h)
+    local compact = w <= 520 and h <= 340
+    local layout = {
+        compact = compact,
+        mainPanelY = 6,
+        sideX = math.floor(clamp(w * 0.15, 96, 128)),
+        chtXOffset = 4,
+        topY = 64,
+        bottomY = h - 58,
+        radiusBias = 22,
+        minRadius = 60,
+        maxRadius = 88,
+        fuelPanelW = FUEL_PANEL_W,
+        rpmXOffset = -13,
+        rpmYOffset = -32,
+        stackGapY = 80,
+        annunciatorOffsetY = 78,
+        annunciatorW = 102,
+        annunciatorGap = 10,
+        showAnnunciators = true,
+        gaugeLayout = nil
+    }
+
+    if compact then
+        layout.mainPanelY = 4
+        layout.sideX = math.floor(clamp(w * 0.15, 70, 78))
+        layout.chtXOffset = 0
+        layout.topY = layout.mainPanelY + 40
+        layout.bottomY = h - 50
+        layout.radiusBias = 8
+        layout.minRadius = 56
+        layout.maxRadius = 66
+        layout.fuelPanelW = FUEL_FACE_W
+        layout.rpmXOffset = 0
+        layout.rpmYOffset = -22
+        layout.stackGapY = 58
+        layout.annunciatorOffsetY = 72
+        layout.annunciatorW = 88
+        layout.annunciatorGap = 8
+        layout.showAnnunciators = false
+        layout.gaugeLayout = {
+            minLabelX = -1,
+            minLabelY = 8,
+            maxLabelX = 24,
+            maxLabelY = 7,
+            valueXFactor = 0.08,
+            chtLabelAdjust = 1,
+            bitmapCenterX = COMPACT_GAUGE_BITMAP_CENTER_X,
+            bitmapCenterY = COMPACT_GAUGE_BITMAP_CENTER_Y
+        }
+    end
+
+    layout.mainPanelH = h - layout.mainPanelY - 8
+    layout.leftX = layout.sideX
+    layout.rightX = w - layout.sideX
+    layout.chtLeftX = layout.leftX - layout.chtXOffset
+    layout.chtRightX = layout.rightX + layout.chtXOffset
+    layout.chtY = layout.topY + 36
+    layout.radius = math.floor(
+        clamp(
+            (layout.bottomY - layout.topY) / 2 + layout.radiusBias,
+            layout.minRadius,
+            layout.maxRadius
+        )
+    )
+    layout.chtValueY = layout.chtY + 1
+    layout.chtLabelY = layout.chtValueY + 23
+    layout.bottomValueY = layout.bottomY + 3
+    layout.bottomLabelY = layout.bottomValueY + 23
+    layout.stackX = math.floor((w - layout.fuelPanelW) / 2)
+    layout.rpmX = math.floor((w - RPM_FACE_W) / 2) + layout.rpmXOffset
+    layout.rpmY = layout.topY + layout.rpmYOffset
+    layout.flowY = layout.rpmY + layout.stackGapY
+    layout.fuelY = layout.flowY + layout.stackGapY
+    layout.annunciatorY = layout.fuelY + layout.annunciatorOffsetY
+    layout.annunciatorX = math.floor(
+        (w - (layout.annunciatorW * 2 + layout.annunciatorGap)) / 2
+    )
+
+    return layout
+end
+
 -- SEMI-CIRCLE GAUGE
 ------------------------------------------------------------
 local function drawSemiGauge(
@@ -737,8 +913,11 @@ local function drawSemiGauge(
     valueY,
     arcBitmap,
     steppedBitmaps,
-    steppedPrefix
+    steppedPrefix,
+    layout
 )
+    layout = layout or {}
+
     local position = valuePercent(value, minValue, maxValue)
 
     local startAngle = 180
@@ -750,21 +929,21 @@ local function drawSemiGauge(
     )
 
     local minLabelAngle = math.rad(startAngle)
-    local minLabelRadius = radius - thickness - 1
+    local minLabelRadius = radius - thickness - (layout.minLabelInset or 1)
 
     drawTinyText(
-        round(centerX + math.cos(minLabelAngle) * minLabelRadius - 3),
-        round(centerY + math.sin(minLabelAngle) * minLabelRadius + 9),
+        round(centerX + math.cos(minLabelAngle) * minLabelRadius + (layout.minLabelX or -3)),
+        round(centerY + math.sin(minLabelAngle) * minLabelRadius + (layout.minLabelY or 9)),
         formatValue(minValue, decimals, nil),
         COL_LABEL
     )
 
     local maxLabelAngle = math.rad(endAngle)
-    local maxLabelRadius = radius - thickness - 2
+    local maxLabelRadius = radius - thickness - (layout.maxLabelInset or 2)
 
     drawTinyText(
-        round(centerX + math.cos(maxLabelAngle) * maxLabelRadius + 38),
-        round(centerY + math.sin(maxLabelAngle) * maxLabelRadius + 8),
+        round(centerX + math.cos(maxLabelAngle) * maxLabelRadius + (layout.maxLabelX or 38)),
+        round(centerY + math.sin(maxLabelAngle) * maxLabelRadius + (layout.maxLabelY or 8)),
         formatValue(maxValue, decimals, nil),
         COL_LABEL,
         RIGHT
@@ -791,7 +970,13 @@ local function drawSemiGauge(
         ) or activeGaugeBitmap
     end
 
-    drawCenteredGaugeBitmap(activeGaugeBitmap, centerX, centerY)
+    drawCenteredGaugeBitmap(
+        activeGaugeBitmap,
+        centerX,
+        centerY,
+        layout.bitmapCenterX,
+        layout.bitmapCenterY
+    )
 
     --------------------------------------------------------
     -- Value readout
@@ -805,11 +990,11 @@ local function drawSemiGauge(
     end
 
     local valueText = formatValue(value, decimals, unit)
-    local valueX = centerX + radius * 0.12
+    local valueX = centerX + radius * (layout.valueXFactor or 0.12)
     local labelX = valueX
 
     if string.sub(label or "", 1, 3) == "CHT" then
-        labelX = labelX + 2
+        labelX = labelX + (layout.chtLabelAdjust or 2)
     end
     local valueDrawY = valueY or centerY + 12
 
@@ -1252,6 +1437,9 @@ local function paintFullDashboard(widget)
     local bat2Max = widget.v2_max or 8.4
 
     local rpmMax = widget.rpm_max or 8500
+    local rpmIdle = widget.rpm_idle or 800
+    local rpmRedline = widget.rpm_redline or 8000
+    local flowMin = widget.ff_min or 0
     local flowMax = widget.ff_max or 100
     local fuelCapacity = widget.fuel_cap or 1000
 
@@ -1286,45 +1474,32 @@ local function paintFullDashboard(widget)
     --------------------------------------------------------
     -- Main areas
     --------------------------------------------------------
-    local mainPanelY = 6
-    local mainPanelH = h - mainPanelY - 8
+    local layout = fullDashboardLayout(w, h)
+    local activeTempGaugeBitmap = tempGaugeBitmap
+    local activeBatteryGaugeBitmap = batteryGaugeBitmap
+    local activeTempGaugeBitmapsByAngle = tempGaugeBitmapsByAngle
+    local activeBatteryGaugeBitmapsByAngle = batteryGaugeBitmapsByAngle
+    local activeTempGaugePrefix = "arc_temp"
+    local activeBatteryGaugePrefix = "arc_batt"
 
-    drawBox(8, mainPanelY, w - 16, mainPanelH)
+    if layout.compact then
+        activeTempGaugeBitmap = compactTempGaugeBitmap or tempGaugeBitmap
+        activeBatteryGaugeBitmap = compactBatteryGaugeBitmap or batteryGaugeBitmap
+        activeTempGaugeBitmapsByAngle = compactTempGaugeBitmapsByAngle
+        activeBatteryGaugeBitmapsByAngle = compactBatteryGaugeBitmapsByAngle
+        activeTempGaugePrefix = "arc_temp_compact"
+        activeBatteryGaugePrefix = "arc_batt_compact"
+    end
 
-    --------------------------------------------------------
-    -- Gauge geometry
-    --------------------------------------------------------
-    local sideX = math.floor(
-        clamp(w * 0.15, 96, 128)
-    )
-
-    local leftX = sideX
-    local rightX = w - sideX
-    local chtLeftX = leftX - 4
-    local chtRightX = rightX + 4
-
-    local topY = mainPanelY + 58
-    local chtY = topY + 36
-    local bottomY = h - 58
-
-    local radius = math.floor(
-        clamp((bottomY - topY) / 2 + 22, 60, 88)
-    )
-
-    local topLabelY = topY - 4
-    local topValueY = topY + 18
-    local chtValueY = chtY + 1
-    local chtLabelY = chtValueY + 23
-    local bottomValueY = bottomY + 3
-    local bottomLabelY = bottomValueY + 23
+    drawBox(8, layout.mainPanelY, w - 16, layout.mainPanelH)
 
     --------------------------------------------------------
     -- Temperature gauges
     --------------------------------------------------------
     drawSemiGauge(
-        chtLeftX,
-        chtY,
-        radius,
+        layout.chtLeftX,
+        layout.chtY,
+        layout.radius,
         cht1,
         cht1Min,
         cht1Max,
@@ -1336,17 +1511,18 @@ local function paintFullDashboard(widget)
             {cht1Yellow, cht1Red, COL_YELLOW},
             {cht1Red, 1.00, COL_RED}
         },
-        chtLabelY,
-        chtValueY,
-        tempGaugeBitmap,
-        tempGaugeBitmapsByAngle,
-        "arc_temp"
+        layout.chtLabelY,
+        layout.chtValueY,
+        activeTempGaugeBitmap,
+        activeTempGaugeBitmapsByAngle,
+        activeTempGaugePrefix,
+        layout.gaugeLayout
     )
 
     drawSemiGauge(
-        chtRightX,
-        chtY,
-        radius,
+        layout.chtRightX,
+        layout.chtY,
+        layout.radius,
         cht2,
         cht2Min,
         cht2Max,
@@ -1358,20 +1534,21 @@ local function paintFullDashboard(widget)
             {cht2Yellow, cht2Red, COL_YELLOW},
             {cht2Red, 1.00, COL_RED}
         },
-        chtLabelY,
-        chtValueY,
-        tempGaugeBitmap,
-        tempGaugeBitmapsByAngle,
-        "arc_temp"
+        layout.chtLabelY,
+        layout.chtValueY,
+        activeTempGaugeBitmap,
+        activeTempGaugeBitmapsByAngle,
+        activeTempGaugePrefix,
+        layout.gaugeLayout
     )
 
     --------------------------------------------------------
     -- Battery gauges
     --------------------------------------------------------
     drawSemiGauge(
-        leftX,
-        bottomY,
-        radius,
+        layout.leftX,
+        layout.bottomY,
+        layout.radius,
         bat1,
         bat1Min,
         bat1Max,
@@ -1383,17 +1560,18 @@ local function paintFullDashboard(widget)
             {bat1Red, bat1Yellow, COL_YELLOW},
             {bat1Yellow, 1.00, COL_GREEN}
         },
-        bottomLabelY,
-        bottomValueY,
-        batteryGaugeBitmap,
-        batteryGaugeBitmapsByAngle,
-        "arc_batt"
+        layout.bottomLabelY,
+        layout.bottomValueY,
+        activeBatteryGaugeBitmap,
+        activeBatteryGaugeBitmapsByAngle,
+        activeBatteryGaugePrefix,
+        layout.gaugeLayout
     )
 
     drawSemiGauge(
-        rightX,
-        bottomY,
-        radius,
+        layout.rightX,
+        layout.bottomY,
+        layout.radius,
         bat2,
         bat2Min,
         bat2Max,
@@ -1405,25 +1583,20 @@ local function paintFullDashboard(widget)
             {bat2Red, bat2Yellow, COL_YELLOW},
             {bat2Yellow, 1.00, COL_GREEN}
         },
-        bottomLabelY,
-        bottomValueY,
-        batteryGaugeBitmap,
-        batteryGaugeBitmapsByAngle,
-        "arc_batt"
+        layout.bottomLabelY,
+        layout.bottomValueY,
+        activeBatteryGaugeBitmap,
+        activeBatteryGaugeBitmapsByAngle,
+        activeBatteryGaugePrefix,
+        layout.gaugeLayout
     )
-
-    local stackX = w / 2 - FUEL_PANEL_W / 2
-    local rpmY = topY - 32
-    local flowY = rpmY + 80
-    local fuelY = flowY + 80
-    local annunciatorY = fuelY + 78
 
     --------------------------------------------------------
     -- RPM
     --------------------------------------------------------
     drawRpmGauge(
-        w / 2 - RPM_FACE_W / 2 - 13,
-        rpmY,
+        layout.rpmX,
+        layout.rpmY,
         RPM_FACE_W,
         RPM_FACE_H,
         rpm,
@@ -1436,9 +1609,9 @@ local function paintFullDashboard(widget)
     -- Fuel section
     --------------------------------------------------------
     drawFuelGauge(
-        stackX,
-        flowY,
-        FUEL_PANEL_W,
+        layout.stackX,
+        layout.flowY,
+        layout.fuelPanelW,
         "FF ML/MIN",
         fuelFlow,
         flowMin,
@@ -1454,9 +1627,9 @@ local function paintFullDashboard(widget)
     )
 
     drawFuelGauge(
-        stackX,
-        fuelY,
-        FUEL_PANEL_W,
+        layout.stackX,
+        layout.fuelY,
+        layout.fuelPanelW,
         "FUEL ML",
         fuelRemaining,
         0,
@@ -1472,24 +1645,21 @@ local function paintFullDashboard(widget)
         "remaining"
     )
 
-    local annunciatorW = 102
-    local annunciatorGap = 10
-    local annunciatorX =
-        w / 2 - annunciatorW - annunciatorGap / 2
+    if layout.showAnnunciators then
+        ignitionAnnunciator(
+            layout.annunciatorX,
+            layout.annunciatorY,
+            layout.annunciatorW,
+            ignitionEnabled
+        )
 
-    ignitionAnnunciator(
-        annunciatorX,
-        annunciatorY,
-        annunciatorW,
-        ignitionEnabled
-    )
-
-    modeAnnunciator(
-        annunciatorX + annunciatorW + annunciatorGap,
-        annunciatorY,
-        annunciatorW,
-        modeState
-    )
+        modeAnnunciator(
+            layout.annunciatorX + layout.annunciatorW + layout.annunciatorGap,
+            layout.annunciatorY,
+            layout.annunciatorW,
+            modeState
+        )
+    end
 end
 
 ------------------------------------------------------------
