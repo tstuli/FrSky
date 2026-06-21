@@ -1,6 +1,6 @@
 ![](sample.png?raw=true)
 
-A FrSky Ethos widget meant for the X20 sized displays.
+A FrSky Ethos widget meant for the X20 and X18 sized displays.
 Supports dual RPM, dual temperature sensors, fuel flow and fuel quantity telemetry readouts.
 Additionally has annunciators for both ignition enable and stabalizer mode.
 
